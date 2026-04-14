@@ -4,10 +4,7 @@ using MegaplanSync.Core.Models.Deal;
 using MegaplanSync.Core.Interfaces;
 using MegaplanSync.Logging;
 using MegaplanSync.Service;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+
 
 namespace MPIC
 {
@@ -21,31 +18,36 @@ namespace MPIC
             logger.LogInformation("Инициализация");
 
             var serializer = new JsonHelper(logger);
-            var monitoringSettings = serializer.LoadEntityFromFile<MonitoringSettings>(Consts.APP_SETTINGS_FILE);
+            var rootSettings = serializer.LoadEntityFromFile<RootSettings>(Consts.APP_SETTINGS_FILE);
+            
+            var emailService = new EmailService(rootSettings?.NotificationSettings, logger);
 
-            if (monitoringSettings == null || monitoringSettings.MonitoredMailboxes == null || monitoringSettings.MonitoredMailboxes.Count == 0)
+            if (rootSettings == null || rootSettings.MonitoredMailboxes == null || rootSettings.MonitoredMailboxes.Count == 0)
             {
                 logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
+                await emailService.SendNotificationAsync("Критическая ошибка MPIC", "Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
                 Console.ReadLine();
                 return;
             }
 
-            foreach (var mailbox in monitoringSettings.MonitoredMailboxes)
+            foreach (var mailbox in rootSettings.MonitoredMailboxes)
             {
-                await CheckMailboxIntegration(logger, mailbox, monitoringSettings.MaxTimeToCreateDealAfterLetter);
+                await CheckMailboxIntegration(logger, emailService, mailbox, rootSettings.MaxTimeToCreateDealAfterLetter);
             }
 
             Console.ReadLine();
         }
 
-        private static async Task CheckMailboxIntegration(ILogger logger, MailboxSettings mailbox, int maxTimeToCreateDealAfterLetter)
+        private static async Task CheckMailboxIntegration(ILogger logger, EmailService emailService, MailboxSettings mailbox, int maxTimeToCreateDealAfterLetter)
         {
             logger.LogInformation($"--- Проверка интеграции для ящика {mailbox.Username} ---");
 
             var lastLetter = await GetLastLetterInfo(logger, mailbox.Username, mailbox.Password);
             if (lastLetter == null)
             {
-                logger.LogError($"Не удалось получить последнее письмо для {mailbox.Username}.");
+                string errorMsg = $"Не удалось получить последнее письмо для {mailbox.Username}.";
+                logger.LogError(errorMsg, logToConsole: true);
+                await emailService.SendNotificationAsync($"Ошибка интеграции MPIC: {mailbox.Username}", errorMsg);
                 return;
             }
 
@@ -53,7 +55,9 @@ namespace MPIC
             var lastDeals = await GetLastDeals(logger, targetDateTime);
             if (lastDeals == null)
             {
-                 logger.LogError($"Не удалось получить сделки для проверки ящика {mailbox.Username}.");
+                 string errorMsg = $"Не удалось получить сделки из Мегаплана для проверки ящика {mailbox.Username}.";
+                 logger.LogError(errorMsg, logToConsole: true);
+                 await emailService.SendNotificationAsync($"Ошибка интеграции MPIC: {mailbox.Username}", errorMsg);
                  return;
             }
 
@@ -70,12 +74,16 @@ namespace MPIC
                 }
                 else
                 {
-                    logger.LogWarning($"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).");
+                    string warningMsg = $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
+                    logger.LogWarning(warningMsg);
+                    await emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
                 }
             }
             else
             {
-                logger.LogError($"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки, созданной после письма от {lastLetter.Sender} ({targetDateTime}).");
+                string errorMsg = $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки, созданной после письма от <b>{lastLetter.Sender}</b>, полученного в {targetDateTime}.";
+                logger.LogError(errorMsg, logToConsole: true);
+                await emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailbox.Username}", errorMsg);
             }
         }
 
@@ -118,7 +126,7 @@ namespace MPIC
             }
             else
             {
-                logger.LogError("Не удалось получить данные о последнем письме");
+                logger.LogError("Не удалось получить данные о последнем письме", logToConsole: true);
                 return null;
             }
         }
