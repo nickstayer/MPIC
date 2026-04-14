@@ -37,7 +37,7 @@ namespace MPIC
             {
                 logger.LogInformation($"Интеграция с ящиком {username1} работает исправно");
             }
-            else if (diffLessThanSpecifiedPeriod1)
+            else if (match1.Count > 0 && !diffLessThanSpecifiedPeriod1)
             {
                 logger.LogInformation($"Интеграция с ящиком {username1} работает исправно, но на создание сделки ушло {diff1} минут");
             }
@@ -59,7 +59,7 @@ namespace MPIC
             {
                 logger.LogInformation($"Интеграция с ящиком {username2} работает исправно");
             }
-            else if (diffLessThanSpecifiedPeriod2)
+            else if (match2.Count > 0 && !diffLessThanSpecifiedPeriod2)
             {
                 logger.LogInformation($"Интеграция с ящиком {username2} работает исправно, но на создание сделки ушло {diff2} минут");
             }
@@ -67,7 +67,7 @@ namespace MPIC
             {
                 logger.LogInformation($"Интеграция с ящиком {username2} НЕ работает");
             }
-
+            Console.ReadLine();
         }
 
         private static async Task<List<Deal>> GetLastDeals(ILogger logger, DateTime targetDateTime)
