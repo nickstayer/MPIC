@@ -1,0 +1,102 @@
+[
+  {
+    "ClassPropertyName": "ContentType",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Id",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Name",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "FirstName",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "MiddleName",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "LastName",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Position",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Department",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Uid",
+    "ClassPropertyType": "long",
+    "NullEquivalent": 0
+  },
+  {
+    "ClassPropertyName": "Gender",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Birthday",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "ContactInfo",
+    "ClassPropertyType": "List<nested-class>",
+    "NullEquivalent": []
+  },
+  {
+    "ClassPropertyName": "ContactInfoCount",
+    "ClassPropertyType": "int",
+    "NullEquivalent": 0
+  },
+  {
+    "ClassPropertyName": "IsWorking",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "NearestVacation",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "IsReadable",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "IsOnline",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "LastOnline",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "CanLogin",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "Avatar",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  }
+]

@@ -66,7 +66,7 @@ namespace MPIC
                 
                 if (diff < maxTimeToCreateDealAfterLetter)
                 {
-                    logger.LogInformation($"Интеграция с ящиком {mailbox.Username} работает исправно. Сделка создана за {diff:F2} мин.");
+                    logger.LogInformation($"Интеграция с ящиком {mailbox.Username} работает исправно. Письмо получено в {targetDateTime}. Сделка создана в {dealTimeCreated}, через {diff:F2} мин.");
                 }
                 else
                 {
