@@ -4,6 +4,10 @@ using MegaplanSync.Core.Models.Deal;
 using MegaplanSync.Core.Interfaces;
 using MegaplanSync.Logging;
 using MegaplanSync.Service;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace MPIC
 {
@@ -11,64 +15,70 @@ namespace MPIC
     {
         static async Task Main(string[] args)
         {
-            var username1 = "autodeal@chelzeo.ru";
-            var password1 = "xkvrztrnmlxfdmgj";
-
-            var username2 = "chelzeomarket@chelzeo.ru";
-            var password2 = "syzwzbehbqugbsnk";
-
-            var maxTimeToCreateDealAfterLetter = 5;
-
             Logger.Initialize();
             ILogger logger = Logger.Instance;
             logger.OnLogFormattedMessage += Console.WriteLine;
             logger.LogInformation("Инициализация");
 
+            var serializer = new JsonHelper(logger);
+            var monitoringSettings = serializer.LoadEntityFromFile<MonitoringSettings>(Consts.APP_SETTINGS_FILE);
 
-            var lastLetter1 = await GetLastLetterInfo(logger, username1, password1);
-            var targetDateTime1 = lastLetter1.ReceivedDate.ToLocalTime().DateTime;
-            var lastDeals1 = await GetLastDeals(logger, targetDateTime1);
-            var match1 = lastDeals1.Where(d => d.Contractor?.FirstName == lastLetter1.Sender).ToList();
-            var dealTimeCreated1 = match1?.FirstOrDefault()?.TimeCreated.Value;
-            var diff1 = (dealTimeCreated1 - targetDateTime1)?.TotalMinutes;
-            var diffLessThanSpecifiedPeriod1 = diff1 < maxTimeToCreateDealAfterLetter;
-
-            if (match1.Count > 0 && diffLessThanSpecifiedPeriod1)
+            if (monitoringSettings == null || monitoringSettings.MonitoredMailboxes == null || monitoringSettings.MonitoredMailboxes.Count == 0)
             {
-                logger.LogInformation($"Интеграция с ящиком {username1} работает исправно");
-            }
-            else if (match1.Count > 0 && !diffLessThanSpecifiedPeriod1)
-            {
-                logger.LogInformation($"Интеграция с ящиком {username1} работает исправно, но на создание сделки ушло {diff1} минут");
-            }
-            else if (match1.Count == 0)
-            {
-                logger.LogInformation($"Интеграция с ящиком {username1} НЕ работает");
+                logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
+                Console.ReadLine();
+                return;
             }
 
+            foreach (var mailbox in monitoringSettings.MonitoredMailboxes)
+            {
+                await CheckMailboxIntegration(logger, mailbox, monitoringSettings.MaxTimeToCreateDealAfterLetter);
+            }
 
-            var lastLetter2 = await GetLastLetterInfo(logger, username2, password2);
-            var targetDateTime2 = lastLetter2.ReceivedDate.ToLocalTime().DateTime;
-            var lastDeals2 = await GetLastDeals(logger, targetDateTime2);
-            var match2 = lastDeals2.Where(d => d.Contractor?.FirstName == lastLetter2.Sender).ToList();
-            var dealTimeCreated2 = match2?.FirstOrDefault()?.TimeCreated.Value;
-            var diff2 = (dealTimeCreated2 - targetDateTime2)?.TotalMinutes;
-            var diffLessThanSpecifiedPeriod2 = diff2 < maxTimeToCreateDealAfterLetter;
-
-            if (match2.Count > 0 && diffLessThanSpecifiedPeriod2)
-            {
-                logger.LogInformation($"Интеграция с ящиком {username2} работает исправно");
-            }
-            else if (match2.Count > 0 && !diffLessThanSpecifiedPeriod2)
-            {
-                logger.LogInformation($"Интеграция с ящиком {username2} работает исправно, но на создание сделки ушло {diff2} минут");
-            }
-            else if (match2.Count == 0)
-            {
-                logger.LogInformation($"Интеграция с ящиком {username2} НЕ работает");
-            }
             Console.ReadLine();
         }
+
+        private static async Task CheckMailboxIntegration(ILogger logger, MailboxSettings mailbox, int maxTimeToCreateDealAfterLetter)
+        {
+            logger.LogInformation($"--- Проверка интеграции для ящика {mailbox.Username} ---");
+
+            var lastLetter = await GetLastLetterInfo(logger, mailbox.Username, mailbox.Password);
+            if (lastLetter == null)
+            {
+                logger.LogError($"Не удалось получить последнее письмо для {mailbox.Username}.");
+                return;
+            }
+
+            var targetDateTime = lastLetter.ReceivedDate.ToLocalTime().DateTime;
+            var lastDeals = await GetLastDeals(logger, targetDateTime);
+            if (lastDeals == null)
+            {
+                 logger.LogError($"Не удалось получить сделки для проверки ящика {mailbox.Username}.");
+                 return;
+            }
+
+            var match = lastDeals.Where(d => d.Contractor?.FirstName == lastLetter.Sender).ToList();
+            
+            if (match.Any())
+            {
+                var dealTimeCreated = match.First().TimeCreated.Value;
+                var diff = (dealTimeCreated - targetDateTime).TotalMinutes;
+                
+                if (diff < maxTimeToCreateDealAfterLetter)
+                {
+                    logger.LogInformation($"Интеграция с ящиком {mailbox.Username} работает исправно. Сделка создана за {diff:F2} мин.");
+                }
+                else
+                {
+                    logger.LogWarning($"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).");
+                }
+            }
+            else
+            {
+                logger.LogError($"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки, созданной после письма от {lastLetter.Sender} ({targetDateTime}).");
+            }
+        }
+
 
         private static async Task<List<Deal>> GetLastDeals(ILogger logger, DateTime targetDateTime)
         {
@@ -81,7 +91,7 @@ namespace MPIC
                 || string.IsNullOrWhiteSpace(appSettings.BaseApUrl)
                 || string.IsNullOrWhiteSpace(appSettings.ConnectionString))
             {
-                logger.LogCritical("Ошибка: некорректные настройки.");
+                logger.LogCritical("Ошибка: некорректные настройки для доступа к API Мегаплана.");
                 return null;
             }
             IApiClient apiClient = new MegaApiClient(logger: logger, tokenFile: Consts.TOKEN_FILE_MEGAPLAN,
@@ -103,12 +113,12 @@ namespace MPIC
 
             if (emailDetails != null)
             {
-                logger.LogInformation("Данные получены");
+                logger.LogInformation("Данные о последнем письме получены");
                 return emailDetails;
             }
             else
             {
-                logger.LogError("Не удалось получить данные");
+                logger.LogError("Не удалось получить данные о последнем письме");
                 return null;
             }
         }
