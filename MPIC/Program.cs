@@ -62,7 +62,7 @@ namespace MPIC
             }
 
             var match = lastDeals.Where(d => d.Contractor?.FirstName == lastLetter.Sender).ToList();
-            
+                        
             if (match.Any())
             {
                 var dealTimeCreated = match.First().TimeCreated.Value;
