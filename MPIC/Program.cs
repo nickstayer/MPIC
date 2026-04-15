@@ -61,22 +61,49 @@ namespace MPIC
                  return;
             }
 
-            var match = lastDeals.Where(d => d.Contractor?.FirstName == lastLetter.Sender).ToList();
-                        
+            var contractorEmailInLastDeals = lastDeals
+                .Where(d => d?.Contractor?.ContactInfo != null)
+                .SelectMany(d => d.Contractor.ContactInfo)
+                .Where(ci => !string.IsNullOrEmpty(ci?.Value) && ci.Value.Contains('@'))
+                .Select(ci => ci.Value)
+                .ToList();
+
+            var match = contractorEmailInLastDeals.Where(d => d == lastLetter.Sender).ToList();
+
             if (match.Any())
             {
-                var dealTimeCreated = match.First().TimeCreated.Value;
-                var diff = (dealTimeCreated - targetDateTime).TotalMinutes;
-                
-                if (diff < maxTimeToCreateDealAfterLetter)
+                // Находим все сделки от нужного отправителя
+                var dealsFromSender = lastDeals.Where(d =>
+                    d.Contractor?.ContactInfo?.Any(ci => ci.Value == lastLetter.Sender) ?? false);
+
+                // Из них выбираем самую раннюю, созданную после письма
+                var bestMatchDeal = dealsFromSender
+                    .Where(d => d.TimeCreated != null)
+                    .OrderBy(d => d.TimeCreated.Value)
+                    .FirstOrDefault();
+
+                if (bestMatchDeal != null)
                 {
-                    logger.LogInformation($"Интеграция с ящиком {mailbox.Username} работает исправно. Письмо получено в {targetDateTime}. Сделка создана в {dealTimeCreated}, через {diff:F2} мин.");
+                    var dealTimeCreated = bestMatchDeal.TimeCreated.Value;
+                    var diff = (dealTimeCreated - targetDateTime).TotalMinutes;
+
+                    if (diff < maxTimeToCreateDealAfterLetter)
+                    {
+                        logger.LogInformation($"Интеграция с ящиком {mailbox.Username} работает исправно. Письмо получено в {targetDateTime}. Сделка создана в {dealTimeCreated}, через {diff:F2} мин.");
+                    }
+                    else
+                    {
+                        string warningMsg = $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
+                        logger.LogWarning(warningMsg);
+                        await emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
+                    }
                 }
                 else
                 {
-                    string warningMsg = $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
-                    logger.LogWarning(warningMsg);
-                    await emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
+                    // Этот 'else' соответствует 'if (bestMatchDeal != null)'
+                    string errorMsg = $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки от {lastLetter.Sender}, созданной после письма, полученного в {targetDateTime}.";
+                    logger.LogError(errorMsg, logToConsole: true);
+                    await emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailbox.Username}", errorMsg);
                 }
             }
             else
