@@ -29,6 +29,7 @@ namespace MPIC
 
         // Properties that were in MonitoringSettings
         public int MaxTimeToCreateDealAfterLetter { get; set; }
+        public int RunIntervalMinutes { get; set; }
         public List<MailboxSettings> MonitoredMailboxes { get; set; }
 
         // Nested notification settings

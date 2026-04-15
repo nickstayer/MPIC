@@ -19,23 +19,37 @@ namespace MPIC
 
             var serializer = new JsonHelper(logger);
             var rootSettings = serializer.LoadEntityFromFile<RootSettings>(Consts.APP_SETTINGS_FILE);
-            
+
             var emailService = new EmailService(rootSettings?.NotificationSettings, logger);
 
             if (rootSettings == null || rootSettings.MonitoredMailboxes == null || rootSettings.MonitoredMailboxes.Count == 0)
             {
                 logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
                 await emailService.SendNotificationAsync("Критическая ошибка MPIC", "Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
-                Console.ReadLine();
+                Console.ReadLine(); // Keep readline for critical error exit
                 return;
             }
 
-            foreach (var mailbox in rootSettings.MonitoredMailboxes)
+            while (true)
             {
-                await CheckMailboxIntegration(logger, emailService, mailbox, rootSettings.MaxTimeToCreateDealAfterLetter);
-            }
+                logger.LogInformation("--- Начало цикла проверки ---");
+                foreach (var mailbox in rootSettings.MonitoredMailboxes)
+                {
+                    await CheckMailboxIntegration(logger, emailService, mailbox, rootSettings.MaxTimeToCreateDealAfterLetter);
+                }
+                logger.LogInformation("--- Конец цикла проверки ---");
 
-            Console.ReadLine();
+                if (rootSettings.RunIntervalMinutes > 0)
+                {
+                    logger.LogInformation($"Следующий запуск через {rootSettings.RunIntervalMinutes} мин.");
+                    await Task.Delay(rootSettings.RunIntervalMinutes * 60 * 1000);
+                }
+                else
+                {
+                    logger.LogInformation("Интервал запуска не настроен или равен 0. Завершение работы.");
+                    break;
+                }
+            }
         }
 
         private static async Task CheckMailboxIntegration(ILogger logger, EmailService emailService, MailboxSettings mailbox, int maxTimeToCreateDealAfterLetter)
