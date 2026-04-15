@@ -64,6 +64,7 @@ namespace MPIC
                     {
                         return new EmailDetails
                         {
+                            MessageId = message.MessageId,
                             Sender = sender.Address,
                             ReceivedDate = message.Date,
                             Body = message.TextBody ?? message.HtmlBody
