@@ -92,6 +92,8 @@ namespace MPIC
 
             var match = contractorEmailInLastDeals.Where(d => d == lastLetter.Sender).ToList();
 
+            bool isDealCreated = false; // Flag to track if a deal was successfully created and linked
+
             if (match.Any())
             {
                 // Находим все сделки от нужного отправителя
@@ -111,6 +113,8 @@ namespace MPIC
 
                     if (diff < maxTimeToCreateDealAfterLetter)
                     {
+                        // Deal successfully created within the time limit
+                        isDealCreated = true;
                         string successMsg = $"Интеграция с ящиком {mailbox.Username} работает исправно. Письмо получено в {targetDateTime}. Сделка создана в {dealTimeCreated}, через {diff:F2} мин.";
                         logger.LogInformation(successMsg);
                         
@@ -123,6 +127,8 @@ namespace MPIC
                     }
                     else
                     {
+                        // Deal created, but took too long. This is still a "failure" for our purposes.
+                        // It should still trigger a warning/failure notification.
                         string warningMsg = $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
                         logger.LogWarning(warningMsg);
                         // Warnings are treated as failures for notification logic to indicate a problem.
@@ -133,21 +139,31 @@ namespace MPIC
                         }
                     }
                 }
-                else
-                {
-                    // Этот 'else' соответствует 'if (bestMatchDeal != null)'
-                    string errorMsg = $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки от {lastLetter.Sender}, созданной после письма, полученного в {targetDateTime}.";
-                    logger.LogError(errorMsg, logToConsole: true);
-                    if (notificationManager.ShouldSendFailureNotification(mailbox.Username, lastLetter.MessageId))
-                    {
-                        await emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailbox.Username}", errorMsg);
-                        notificationManager.RecordFailure(mailbox.Username, lastLetter.MessageId);
-
-                    }
-                }
             }
-            else
+
+            // If isDealCreated is false at this point, it means no valid deal was found (either match.Any() was false
+            // or bestMatchDeal was null). Now we apply the waiting logic.
+            if (!isDealCreated)
             {
+                var timeSinceLetter = (DateTime.Now - targetDateTime).TotalMinutes;
+
+                if (timeSinceLetter < maxTimeToCreateDealAfterLetter)
+                {
+                    var timeToWaitMinutes = maxTimeToCreateDealAfterLetter - timeSinceLetter;
+                    logger.LogInformation($"Сделка для ящика {mailbox.Username} еще не создана. Ожидание {timeToWaitMinutes:F2} мин до повторной проверки.");
+                    // Ensure a minimum wait to avoid busy looping if timeToWaitMinutes is very small or negative.
+                    var actualWaitTime = TimeSpan.FromMinutes(Math.Max(1, timeToWaitMinutes)); 
+                    await Task.Delay(actualWaitTime);
+                    // Re-run check for the current mailbox
+                    await CheckMailboxIntegration(logger, emailService, notificationManager, mailbox, maxTimeToCreateDealAfterLetter);
+                    return; 
+                }
+
+                // If we reach here, it means either:
+                // 1. isDealCreated is false AND timeSinceLetter >= maxTimeToCreateDealAfterLetter (it's definitely a failure)
+                // 2. Or, the above waiting logic was skipped because timeSinceLetter was already >= maxTimeToCreateDealAfterLetter
+                
+                // This is the common failure path. The error message needs to be more general now.
                 string errorMsg = $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки, созданной после письма от <b>{lastLetter.Sender}</b>, полученного в {targetDateTime}.";
                 logger.LogError(errorMsg, logToConsole: true);
                 if (notificationManager.ShouldSendFailureNotification(mailbox.Username, lastLetter.MessageId))
