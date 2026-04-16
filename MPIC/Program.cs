@@ -114,11 +114,11 @@ namespace MPIC
                         string successMsg = $"Интеграция с ящиком {mailbox.Username} работает исправно. Письмо получено в {targetDateTime}. Сделка создана в {dealTimeCreated}, через {diff:F2} мин.";
                         logger.LogInformation(successMsg);
                         
-                        if (notificationManager.ShouldSendSuccessNotification())
+                        if (notificationManager.ShouldSendSuccessNotification(mailbox.Username))
                         {
                             logger.LogInformation("Обнаружено восстановление работы интеграции. Отправка уведомления.");
                             await emailService.SendNotificationAsync($"Восстановление интеграции MPIC: {mailbox.Username}", $"Интеграция восстановлена. Последняя успешная сделка создана для письма от {lastLetter.Sender} в {dealTimeCreated}.");
-                            notificationManager.RecordSuccess();
+                            notificationManager.RecordSuccess(mailbox.Username);
                         }
                     }
                     else
@@ -126,10 +126,10 @@ namespace MPIC
                         string warningMsg = $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
                         logger.LogWarning(warningMsg);
                         // Warnings are treated as failures for notification logic to indicate a problem.
-                        if (notificationManager.ShouldSendFailureNotification(lastLetter.MessageId))
+                        if (notificationManager.ShouldSendFailureNotification(mailbox.Username, lastLetter.MessageId))
                         {
                            await emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
-                           notificationManager.RecordFailure(lastLetter.MessageId);
+                           notificationManager.RecordFailure(mailbox.Username, lastLetter.MessageId);
                         }
                     }
                 }
@@ -138,10 +138,10 @@ namespace MPIC
                     // Этот 'else' соответствует 'if (bestMatchDeal != null)'
                     string errorMsg = $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки от {lastLetter.Sender}, созданной после письма, полученного в {targetDateTime}.";
                     logger.LogError(errorMsg, logToConsole: true);
-                    if (notificationManager.ShouldSendFailureNotification(lastLetter.MessageId))
+                    if (notificationManager.ShouldSendFailureNotification(mailbox.Username, lastLetter.MessageId))
                     {
                         await emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailbox.Username}", errorMsg);
-                        notificationManager.RecordFailure(lastLetter.MessageId);
+                        notificationManager.RecordFailure(mailbox.Username, lastLetter.MessageId);
 
                     }
                 }
@@ -150,10 +150,10 @@ namespace MPIC
             {
                 string errorMsg = $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки, созданной после письма от <b>{lastLetter.Sender}</b>, полученного в {targetDateTime}.";
                 logger.LogError(errorMsg, logToConsole: true);
-                if (notificationManager.ShouldSendFailureNotification(lastLetter.MessageId))
+                if (notificationManager.ShouldSendFailureNotification(mailbox.Username, lastLetter.MessageId))
                 {
                     await emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailbox.Username}", errorMsg);
-                    notificationManager.RecordFailure(lastLetter.MessageId);
+                    notificationManager.RecordFailure(mailbox.Username, lastLetter.MessageId);
                 }
             }
         }

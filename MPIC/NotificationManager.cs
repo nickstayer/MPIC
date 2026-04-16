@@ -9,8 +9,10 @@ namespace MPIC
 
         private class NotificationState
         {
-            public bool IsIntegrationBroken { get; set; }
-            public HashSet<string> NotifiedErrorMessages { get; set; } = new HashSet<string>();
+            // Set of mailbox usernames that are currently considered broken.
+            public HashSet<string> BrokenMailboxes { get; set; } = new HashSet<string>();
+            // Key: mailbox username. Value: Set of message-IDs for which notifications have been sent.
+            public Dictionary<string, HashSet<string>> NotifiedErrors { get; set; } = new Dictionary<string, HashSet<string>>();
         }
 
         public NotificationManager()
@@ -44,31 +46,50 @@ namespace MPIC
             File.WriteAllText(StateFilePath, json);
         }
 
-        public bool ShouldSendFailureNotification(string messageId)
+        public bool ShouldSendFailureNotification(string mailboxId, string messageId)
         {
-            if (string.IsNullOrEmpty(messageId)) return true; // Always notify if we can't track the message
-            return !_state.NotifiedErrorMessages.Contains(messageId);
+            // Always notify if we can't track the message
+            if (string.IsNullOrEmpty(messageId)) return true; 
+
+            // If we have records for this mailbox, check if we've already notified for this message
+            if (_state.NotifiedErrors.TryGetValue(mailboxId, out var notifiedMessages))
+            {
+                return !notifiedMessages.Contains(messageId);
+            }
+
+            // No records for this mailbox yet, so we should definitely notify
+            return true;
         }
 
-        public void RecordFailure(string messageId)
+        public void RecordFailure(string mailboxId, string messageId)
         {
+            _state.BrokenMailboxes.Add(mailboxId);
+
             if (!string.IsNullOrEmpty(messageId))
             {
-                _state.NotifiedErrorMessages.Add(messageId);
+                if (!_state.NotifiedErrors.ContainsKey(mailboxId))
+                {
+                    _state.NotifiedErrors[mailboxId] = new HashSet<string>();
+                }
+                _state.NotifiedErrors[mailboxId].Add(messageId);
             }
-            _state.IsIntegrationBroken = true;
+            
             SaveState();
         }
 
-        public bool ShouldSendSuccessNotification()
+        public bool ShouldSendSuccessNotification(string mailboxId)
         {
-            return _state.IsIntegrationBroken;
+            return _state.BrokenMailboxes.Contains(mailboxId);
         }
 
-        public void RecordSuccess()
+        public void RecordSuccess(string mailboxId)
         {
-            _state.IsIntegrationBroken = false;
-            _state.NotifiedErrorMessages.Clear();
+            _state.BrokenMailboxes.Remove(mailboxId);
+            // Clean up the error message history for the recovered mailbox
+            if (_state.NotifiedErrors.ContainsKey(mailboxId))
+            {
+                _state.NotifiedErrors.Remove(mailboxId);
+            }
             SaveState();
         }
     }
