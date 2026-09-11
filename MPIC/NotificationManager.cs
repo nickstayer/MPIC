@@ -13,6 +13,8 @@ namespace MPIC
             public HashSet<string> BrokenMailboxes { get; set; } = new HashSet<string>();
             // Key: mailbox username. Value: Set of message-IDs for which notifications have been sent.
             public Dictionary<string, HashSet<string>> NotifiedErrors { get; set; } = new Dictionary<string, HashSet<string>>();
+            // Key: mailbox username. Value: UTC time of the most recent email that was already processed.
+            public Dictionary<string, DateTime> LastProcessedEmailTimeUtc { get; set; } = new Dictionary<string, DateTime>();
         }
 
         public NotificationManager()
@@ -46,34 +48,83 @@ namespace MPIC
             File.WriteAllText(StateFilePath, json);
         }
 
-        public bool ShouldSendFailureNotification(string mailboxId, string messageId)
+        /// <summary>
+        /// Возвращает UTC-время последнего обработанного письма для указанного ящика.
+        /// Начальное значение — DateTime.MinValue (ещё не обрабатывали).
+        /// </summary>
+        public DateTime GetLastProcessedTimeUtc(string mailboxId)
         {
-            // Always notify if we can't track the message
-            if (string.IsNullOrEmpty(messageId)) return true; 
+            return _state.LastProcessedEmailTimeUtc.TryGetValue(mailboxId, out var dt) ? dt : DateTime.MinValue;
+        }
 
-            // If we have records for this mailbox, check if we've already notified for this message
-            if (_state.NotifiedErrors.TryGetValue(mailboxId, out var notifiedMessages))
+        /// <summary>
+        /// Обновляет время последнего обработанного письма (только если новое время больше).
+        /// </summary>
+        public void UpdateLastProcessedTimeUtc(string mailboxId, DateTime utcTime)
+        {
+            if (_state.LastProcessedEmailTimeUtc.TryGetValue(mailboxId, out var existing))
             {
-                return !notifiedMessages.Contains(messageId);
+                if (utcTime <= existing)
+                    return; // не откатываем время назад
+            }
+            _state.LastProcessedEmailTimeUtc[mailboxId] = utcTime;
+            SaveState();
+        }
+
+        /// <summary>
+        /// Проверяет, нужно ли отправить уведомление о сбое.
+        /// Для писем без Message-ID формирует синтетический ключ на основе email отправителя и времени.
+        /// </summary>
+        public bool ShouldSendFailureNotification(string mailboxId, string? messageId, string? senderEmail = null, DateTime? receivedUtc = null)
+        {
+            // Если Message-ID отсутствует — используем составной ключ для дедупликации
+            var effectiveId = messageId;
+            if (string.IsNullOrEmpty(effectiveId))
+            {
+                if (!string.IsNullOrEmpty(senderEmail) && receivedUtc.HasValue)
+                {
+                    // Формируем стабильный синтетический ключ: "__null_{sender}_{date:yyyyMMddHHmm}"
+                    effectiveId = $"__null_{senderEmail}_{receivedUtc.Value:yyyyMMddHHmm}";
+                }
+                else
+                {
+                    // Не хватает данных для дедупликации — всегда уведомляем (защита от молчания)
+                    return true;
+                }
             }
 
-            // No records for this mailbox yet, so we should definitely notify
+            if (_state.NotifiedErrors.TryGetValue(mailboxId, out var notifiedMessages))
+            {
+                return !notifiedMessages.Contains(effectiveId);
+            }
+
             return true;
         }
 
-        public void RecordFailure(string mailboxId, string messageId)
+        public void RecordFailure(string mailboxId, string? messageId, string? senderEmail = null, DateTime? receivedUtc = null)
         {
             _state.BrokenMailboxes.Add(mailboxId);
 
-            if (!string.IsNullOrEmpty(messageId))
+            var effectiveId = messageId;
+            if (string.IsNullOrEmpty(effectiveId))
             {
-                if (!_state.NotifiedErrors.ContainsKey(mailboxId))
+                if (!string.IsNullOrEmpty(senderEmail) && receivedUtc.HasValue)
                 {
-                    _state.NotifiedErrors[mailboxId] = new HashSet<string>();
+                    effectiveId = $"__null_{senderEmail}_{receivedUtc.Value:yyyyMMddHHmm}";
                 }
-                _state.NotifiedErrors[mailboxId].Add(messageId);
+                else
+                {
+                    // Если не можем сформировать ключ — не сохраняем, в ShouldSendFailureNotification будет всегда true
+                    SaveState();
+                    return;
+                }
             }
-            
+
+            if (!_state.NotifiedErrors.ContainsKey(mailboxId))
+            {
+                _state.NotifiedErrors[mailboxId] = new HashSet<string>();
+            }
+            _state.NotifiedErrors[mailboxId].Add(effectiveId);
             SaveState();
         }
 
@@ -85,6 +136,7 @@ namespace MPIC
         public void RecordSuccess(string mailboxId)
         {
             _state.BrokenMailboxes.Remove(mailboxId);
+
             // Clean up the error message history for the recovered mailbox
             if (_state.NotifiedErrors.ContainsKey(mailboxId))
             {

@@ -1,10 +1,10 @@
-﻿using MegaplanSync.ApiClient;
+using MegaplanSync.ApiClient;
 using MegaplanSync.Core;
 using MegaplanSync.Core.Models.Deal;
 using MegaplanSync.Core.Interfaces;
 using MegaplanSync.Logging;
 using MegaplanSync.Service;
-
+using System.Text.RegularExpressions;
 
 namespace MPIC
 {
@@ -27,7 +27,7 @@ namespace MPIC
             {
                 logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
                 await emailService.SendNotificationAsync("Критическая ошибка MPIC", "Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
-                Console.ReadLine(); // Keep readline for critical error exit
+                Console.ReadLine();
                 return;
             }
 
@@ -36,7 +36,7 @@ namespace MPIC
                 logger.LogInformation("--- Начало цикла проверки ---");
                 foreach (var mailbox in rootSettings.MonitoredMailboxes)
                 {
-                    await CheckMailboxIntegration(logger, emailService, notificationManager, mailbox, rootSettings.MaxTimeToCreateDealAfterLetter);
+                    await CheckMailboxIntegration(logger, emailService, notificationManager, mailbox, rootSettings);
                 }
                 logger.LogInformation("--- Конец цикла проверки ---");
 
@@ -53,129 +53,205 @@ namespace MPIC
             }
         }
 
-        private static async Task CheckMailboxIntegration(ILogger logger, EmailService emailService, NotificationManager notificationManager, MailboxSettings mailbox, int maxTimeToCreateDealAfterLetter)
+        /// <summary>
+        /// Извлекает чистый email-адрес из поля контактной информации Мегаплана.
+        /// Мегаплан может хранить email в формате "E-mail user@domain.ru" или просто "user@domain.ru".
+        /// </summary>
+        private static string? ExtractEmailFromContactValue(string? rawValue)
         {
-            logger.LogInformation($"--- Проверка интеграции для ящика {mailbox.Username} ---");
+            if (string.IsNullOrWhiteSpace(rawValue))
+                return null;
 
-            var lastLetter = await GetLastLetterInfo(logger, mailbox.Username, mailbox.Password);
-            if (lastLetter == null)
+            // Ищем email в строке (на случай "E-mail user@domain.ru" или "Email: user@domain.ru")
+            var match = Regex.Match(rawValue, @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}");
+            if (match.Success)
+                return match.Value.ToLowerInvariant();
+
+            // Если регулярка не нашла — возвращаем оригинал (может быть просто email)
+            return rawValue.ToLowerInvariant();
+        }
+
+        private static async Task CheckMailboxIntegration(ILogger logger, EmailService emailService,
+            NotificationManager notificationManager, MailboxSettings mailbox, RootSettings rootSettings)
+        {
+            int maxTimeToCreateDealAfterLetter = rootSettings.MaxTimeToCreateDealAfterLetter;
+            bool skipReplyLetters = rootSettings.SkipReplyLetters;
+            string mailboxId = mailbox.Username;
+
+            logger.LogInformation($"--- Проверка интеграции для ящика {mailboxId} ---");
+
+            // Получаем время последнего обработанного письма (UTC)
+            var lastProcessedUtc = notificationManager.GetLastProcessedTimeUtc(mailboxId);
+
+            // Получаем новые письма (после lastProcessedUtc) или последние 10, если ящик ещё не проверялся
+            var emails = await GetRecentLetters(logger, mailbox.Username, mailbox.Password, lastProcessedUtc);
+            if (emails == null || emails.Count == 0)
             {
-                string errorMsg = $"Не удалось получить последнее письмо для {mailbox.Username}.";
-                logger.LogError(errorMsg, logToConsole: true);
-                // This is a system-level error, not a logic failure, so we'll let it notify every time.
-                await emailService.SendNotificationAsync($"Ошибка интеграции MPIC: {mailbox.Username}", errorMsg);
+                logger.LogInformation($"Новых писем для {mailboxId} с {lastProcessedUtc:yyyy-MM-dd HH:mm:ss} UTC не найдено.");
                 return;
             }
-            
-            if (lastLetter.MessageId == null)
-            {
-                logger.LogWarning($"Не удалось получить Message-ID для последнего письма. Уведомления для этого письма не будут отслеживаться.");
-            }
 
-            var targetDateTime = lastLetter.ReceivedDate.ToLocalTime().DateTime;
-            var lastDeals = await GetLastDeals(logger, targetDateTime);
+            var newestEmail = emails.First();
+            var oldestEmailInBatch = emails.Last();
+            logger.LogInformation($"Получено {emails.Count} писем. Самое новое: от {newestEmail.Sender} " +
+                $"в {newestEmail.ReceivedDate:yyyy-MM-dd HH:mm:ss zzz}. Самое старое: от {oldestEmailInBatch.Sender} " +
+                $"в {oldestEmailInBatch.ReceivedDate:yyyy-MM-dd HH:mm:ss zzz}.");
+
+            // Запрашиваем сделки с запасом, чтобы гарантированно получить все, созданные от этих писем
+            var oldestEmailUtc = oldestEmailInBatch.ReceivedDate.ToUniversalTime().DateTime;
+            var apiQueryTime = oldestEmailUtc.AddHours(-1);
+
+            var lastDeals = await GetLastDeals(logger, apiQueryTime);
             if (lastDeals == null)
             {
-                 string errorMsg = $"Не удалось получить сделки из Мегаплана для проверки ящика {mailbox.Username}.";
-                 logger.LogError(errorMsg, logToConsole: true);
-                 // This is also a system-level error.
-                 await emailService.SendNotificationAsync($"Ошибка интеграции MPIC: {mailbox.Username}", errorMsg);
-                 return;
+                string errorMsg = $"Не удалось получить сделки из Мегаплана для проверки ящика {mailboxId}.";
+                logger.LogError(errorMsg, logToConsole: true);
+                await emailService.SendNotificationAsync($"Ошибка интеграции MPIC: {mailboxId}", errorMsg);
+                return;
             }
 
-            var contractorEmailInLastDeals = lastDeals
-                .Where(d => d?.Contractor?.ContactInfo != null)
-                .SelectMany(d => d.Contractor.ContactInfo)
-                .Where(ci => !string.IsNullOrEmpty(ci?.Value) && ci.Value.Contains('@'))
-                .Select(ci => ci.Value)
-                .ToList();
+            // Перебираем письма от самого нового к самому старому.
+            // Если порог для письма ещё не истёк — прекращаем проверку (это и все более старые будут на следующем цикле).
+            int processedCount = 0;
+            var nowUtc = DateTime.UtcNow;
 
-            var match = contractorEmailInLastDeals.Where(d => d == lastLetter.Sender).ToList();
-
-            bool isDealCreated = false; // Flag to track if a deal was successfully created and linked
-
-            if (match.Any())
+            foreach (var email in emails)
             {
-                // Находим все сделки от нужного отправителя
-                var dealsFromSender = lastDeals.Where(d =>
-                    d.Contractor?.ContactInfo?.Any(ci => ci.Value == lastLetter.Sender) ?? false);
+                var emailReceivedUtc = email.ReceivedDate.ToUniversalTime().DateTime;
+                var elapsedMinutes = (nowUtc - emailReceivedUtc).TotalMinutes;
 
-                // Из них выбираем самую раннюю, созданную после письма
-                var bestMatchDeal = dealsFromSender
-                    .Where(d => d.TimeCreated != null)
-                    .OrderBy(d => d.TimeCreated.Value)
-                    .FirstOrDefault();
-
-                if (bestMatchDeal != null)
+                // Пропускаем письма-ответы/пересылки, если включена опция
+                if (skipReplyLetters && email.IsReplyOrForward())
                 {
-                    var dealTimeCreated = bestMatchDeal.TimeCreated.Value;
-                    var diff = (dealTimeCreated - targetDateTime).TotalMinutes;
+                    logger.LogInformation($"Пропущено письмо-ответ/пересылка от {email.Sender} (тема: \"{email.Subject ?? "(без темы)"}\").");
+                    notificationManager.UpdateLastProcessedTimeUtc(mailboxId, emailReceivedUtc);
+                    processedCount++;
+                    continue;
+                }
 
-                    if (diff < maxTimeToCreateDealAfterLetter)
+                // Если прошло меньше порога — не обрабатываем это и все более старые письма
+                if (elapsedMinutes < maxTimeToCreateDealAfterLetter)
+                {
+                    logger.LogInformation($"Письмо от {email.Sender} от {emailReceivedUtc:yyyy-MM-dd HH:mm:ss} UTC: " +
+                        $"прошло {elapsedMinutes:F1} мин, порог {maxTimeToCreateDealAfterLetter} мин. Ожидаем до следующего цикла.");
+                    break;
+                }
+
+                // Порог истёк — проверяем, есть ли сделка, созданная ПОСЛЕ этого письма от этого же отправителя
+                bool isDealCreated = false;
+                bool isWarning = false;
+                string resultMessage = "";
+
+                // Ищем сделки, email контрагента которых совпадает с отправителем письма
+                var senderEmailLower = email.Sender?.ToLowerInvariant();
+                var matchingDeals = lastDeals
+                    .Where(d => d?.TimeCreated?.Value != null && d.Contractor?.ContactInfo != null && senderEmailLower != null)
+                    .Select(d => new
                     {
-                        // Deal successfully created within the time limit
+                        Deal = d,
+                        ContactEmails = d.Contractor.ContactInfo
+                            .Select(ci => ExtractEmailFromContactValue(ci.Value))
+                            .Where(e => e != null)
+                            .ToList()
+                    })
+                    .Where(x => x.ContactEmails.Contains(senderEmailLower!))
+                    .Select(x => x.Deal)
+                    // ТОЛЬКО сделки, созданные СТРОГО ПОСЛЕ письма
+                    .Where(d => d.TimeCreated!.Value > emailReceivedUtc)
+                    // Сортируем по времени создания (самая ранняя созданная после письма)
+                    .OrderBy(d => d.TimeCreated!.Value)
+                    .ToList();
+
+                if (matchingDeals.Any())
+                {
+                    var bestMatchDeal = matchingDeals.First();
+                    var dealTimeCreated = bestMatchDeal.TimeCreated!.Value;
+                    var diffMinutes = (dealTimeCreated - emailReceivedUtc).TotalMinutes;
+
+                    // diffMinutes гарантированно >= 0, т.к. фильтр выше
+                    if (diffMinutes < maxTimeToCreateDealAfterLetter)
+                    {
+                        // УСПЕХ — сделка создана в пределах порога
                         isDealCreated = true;
-                        string successMsg = $"Интеграция с ящиком {mailbox.Username} работает исправно. Письмо получено в {targetDateTime}. Сделка создана в {dealTimeCreated}, через {diff:F2} мин.";
-                        logger.LogInformation(successMsg);
-                        
-                        if (notificationManager.ShouldSendSuccessNotification(mailbox.Username))
+                        resultMessage = $"Интеграция с ящиком {mailboxId} работает исправно." +
+                            $" Письмо от {email.Sender} получено в {emailReceivedUtc:yyyy-MM-dd HH:mm:ss} UTC." +
+                            $" Сделка создана в {dealTimeCreated:yyyy-MM-dd HH:mm:ss}, через {diffMinutes:F2} мин.";
+                        logger.LogInformation(resultMessage);
+
+                        if (notificationManager.ShouldSendSuccessNotification(mailboxId))
                         {
                             logger.LogInformation("Обнаружено восстановление работы интеграции. Отправка уведомления.");
-                            await emailService.SendNotificationAsync($"Восстановление интеграции MPIC: {mailbox.Username}", $"Интеграция восстановлена. Последняя успешная сделка создана для письма от {lastLetter.Sender} в {dealTimeCreated}.");
-                            notificationManager.RecordSuccess(mailbox.Username);
+                            await emailService.SendNotificationAsync($"Восстановление интеграции MPIC: {mailboxId}",
+                                $"Интеграция восстановлена. " +
+                                $"Последняя успешная сделка создана для письма от {email.Sender} в {dealTimeCreated:yyyy-MM-dd HH:mm:ss}.");
+                            notificationManager.RecordSuccess(mailboxId);
                         }
                     }
                     else
                     {
-                        // Deal created, but took too long. This is still a "failure" for our purposes.
-                        // It should still trigger a warning/failure notification.
-                        string warningMsg = $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
-                        logger.LogWarning(warningMsg);
-                        // Warnings are treated as failures for notification logic to indicate a problem.
-                        if (notificationManager.ShouldSendFailureNotification(mailbox.Username, lastLetter.MessageId))
+                        // СДЕЛКА НАЙДЕНА, НО С ЗАДЕРЖКОЙ — предупреждение
+                        isWarning = true;
+                        resultMessage = $"Интеграция с ящиком {mailboxId} работает, но на создание сделки ушло {diffMinutes:F2} мин" +
+                            $" (больше порога в {maxTimeToCreateDealAfterLetter} мин)." +
+                            $" Письмо от {email.Sender} от {emailReceivedUtc:yyyy-MM-dd HH:mm:ss} UTC.";
+                        logger.LogWarning(resultMessage);
+
+                        if (notificationManager.ShouldSendFailureNotification(mailboxId, email.MessageId, email.Sender, emailReceivedUtc))
                         {
-                           await emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
-                           notificationManager.RecordFailure(mailbox.Username, lastLetter.MessageId);
+                            await emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailboxId}", resultMessage);
+                            notificationManager.RecordFailure(mailboxId, email.MessageId, email.Sender, emailReceivedUtc);
                         }
                     }
                 }
+
+                if (!isDealCreated && !isWarning)
+                {
+                    // СДЕЛКА НЕ НАЙДЕНА — сбой интеграции
+                    resultMessage = $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailboxId} не найдено ни одной сделки, " +
+                        $"созданной после письма от <b>{email.Sender}</b>, полученного в {emailReceivedUtc:yyyy-MM-dd HH:mm:ss} UTC.";
+                    logger.LogError(resultMessage, logToConsole: true);
+
+                    if (notificationManager.ShouldSendFailureNotification(mailboxId, email.MessageId, email.Sender, emailReceivedUtc))
+                    {
+                        await emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailboxId}", resultMessage);
+                        notificationManager.RecordFailure(mailboxId, email.MessageId, email.Sender, emailReceivedUtc);
+                    }
+                }
+
+                // Помечаем письмо как обработанное
+                notificationManager.UpdateLastProcessedTimeUtc(mailboxId, emailReceivedUtc);
+                processedCount++;
             }
 
-            // If isDealCreated is false at this point, it means no valid deal was found (either match.Any() was false
-            // or bestMatchDeal was null). Now we apply the waiting logic.
-            if (!isDealCreated)
+            if (processedCount > 0)
             {
-                var timeSinceLetter = (DateTime.Now - targetDateTime).TotalMinutes;
-
-                if (timeSinceLetter < maxTimeToCreateDealAfterLetter)
-                {
-                    var timeToWaitMinutes = maxTimeToCreateDealAfterLetter - timeSinceLetter;
-                    logger.LogInformation($"Сделка для ящика {mailbox.Username} еще не создана. Ожидание {timeToWaitMinutes:F2} мин до повторной проверки.");
-                    // Ensure a minimum wait to avoid busy looping if timeToWaitMinutes is very small or negative.
-                    var actualWaitTime = TimeSpan.FromMinutes(Math.Max(1, timeToWaitMinutes)); 
-                    await Task.Delay(actualWaitTime);
-                    // Re-run check for the current mailbox
-                    await CheckMailboxIntegration(logger, emailService, notificationManager, mailbox, maxTimeToCreateDealAfterLetter);
-                    return; 
-                }
-
-                // If we reach here, it means either:
-                // 1. isDealCreated is false AND timeSinceLetter >= maxTimeToCreateDealAfterLetter (it's definitely a failure)
-                // 2. Or, the above waiting logic was skipped because timeSinceLetter was already >= maxTimeToCreateDealAfterLetter
-                
-                // This is the common failure path. The error message needs to be more general now.
-                string errorMsg = $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} не найдено ни одной сделки, созданной после письма от <b>{lastLetter.Sender}</b>, полученного в {targetDateTime}.";
-                logger.LogError(errorMsg, logToConsole: true);
-                if (notificationManager.ShouldSendFailureNotification(mailbox.Username, lastLetter.MessageId))
-                {
-                    await emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailbox.Username}", errorMsg);
-                    notificationManager.RecordFailure(mailbox.Username, lastLetter.MessageId);
-                }
+                logger.LogInformation($"Писем обработано: {processedCount}");
             }
         }
 
+        /// <summary>
+        /// Получает последние письма из ящика, начиная с указанной даты (UTC).
+        /// Если дата минимальная — берёт последние 10 писем.
+        /// </summary>
+        private static async Task<List<EmailDetails>?> GetRecentLetters(ILogger logger, string username,
+            string password, DateTime lastProcessedUtc)
+        {
+            var emailReader = new EmailReader(username, password);
+            var emailDetailsList = await emailReader.GetRecentEmailsAsync(lastProcessedUtc, count: 10);
 
-        private static async Task<List<Deal>> GetLastDeals(ILogger logger, DateTime targetDateTime)
+            if (emailDetailsList == null || emailDetailsList.Count == 0)
+            {
+                logger.LogInformation("Новых писем не найдено.");
+                return null;
+            }
+
+            logger.LogInformation($"Получено писем: {emailDetailsList.Count}. " +
+                $"Самое новое: {emailDetailsList.First().ReceivedDate:yyyy-MM-dd HH:mm:ss zzz}");
+
+            return emailDetailsList;
+        }
+
+        private static async Task<List<Deal>> GetLastDeals(ILogger logger, DateTime targetDateTimeUtc)
         {
             var serializer = new JsonHelper(logger);
             var appSettings = serializer.LoadEntityFromFile<AppSettings>(Consts.APP_SETTINGS_FILE);
@@ -193,29 +269,10 @@ namespace MPIC
                 tokenExpAtFile: Consts.TOKEN_EXP_AT_FILE_MEGAPLAN, baseApiUrl: appSettings.BaseApUrl,
                 username: appSettings.Username, password: appSettings.Password);
             IApiDataMapper apiDataMapper = new ApiDataMapper(logger);
-            IDbDataMapper dbDataMapper = new DbDataMapper(logger);
             ApiService apiService = new(logger, apiClient, apiDataMapper);
 
-            List<Deal> deals = await apiService.GetAndMapDealsUpdatedAfter(targetDateTime);
+            List<Deal> deals = await apiService.GetAndMapDealsUpdatedAfter(targetDateTimeUtc);
             return deals;
-        }
-
-        private static async Task<EmailDetails> GetLastLetterInfo(ILogger logger, string username, string password)
-        {
-
-            var emailReader = new EmailReader(username, password);
-            var emailDetails = await emailReader.GetLastEmailDetailsAsync();
-
-            if (emailDetails != null)
-            {
-                logger.LogInformation("Данные о последнем письме получены");
-                return emailDetails;
-            }
-            else
-            {
-                logger.LogError("Не удалось получить данные о последнем письме", logToConsole: true);
-                return null;
-            }
         }
     }
 }

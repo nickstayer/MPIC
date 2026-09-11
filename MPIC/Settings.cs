@@ -34,5 +34,12 @@ namespace MPIC
 
         // Nested notification settings
         public NotificationSettings NotificationSettings { get; set; }
+
+        /// <summary>
+        /// Если true, письма с темой, начинающейся на Re:/Fwd:/R: (ответы/пересылки),
+        /// не будут вызывать сработки интеграции. По умолчанию false — поведение остаётся прежним.
+        /// Включите, если клиенты часто отвечают на письма без намерения создать новую сделку.
+        /// </summary>
+        public bool SkipReplyLetters { get; set; } = false;
     }
 }
