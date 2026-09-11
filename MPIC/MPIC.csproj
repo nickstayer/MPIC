@@ -8,10 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\MegaplanSync\MegaplanSync.ApiClient\MegaplanSync.ApiClient.csproj" />
-    <ProjectReference Include="..\..\MegaplanSync\MegaplanSync.Core\MegaplanSync.Core.csproj" />
-    <ProjectReference Include="..\..\MegaplanSync\MegaplanSync.Logging\MegaplanSync.Logging.csproj" />
-    <ProjectReference Include="..\..\MegaplanSync\MegaplanSync.Service\MegaplanSync.Service.csproj" />
+    <ProjectReference Include="..\MegaplanSync\MegaplanSync.ApiClient\MegaplanSync.ApiClient.csproj" />
+    <ProjectReference Include="..\MegaplanSync\MegaplanSync.Core\MegaplanSync.Core.csproj" />
+    <ProjectReference Include="..\MegaplanSync\MegaplanSync.Logging\MegaplanSync.Logging.csproj" />
+    <ProjectReference Include="..\MegaplanSync\MegaplanSync.Service\MegaplanSync.Service.csproj" />
   </ItemGroup>
 
   <ItemGroup>
