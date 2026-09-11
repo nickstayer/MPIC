@@ -1,0 +1,23 @@
+[ 
+{ 
+"contentType":"Employee",
+"id":"1000164",
+"name":"Амиров Дмитрий",
+"firstName":"Дмитрий",
+"middleName":"Сергеевич",
+"lastName":"Амиров",
+"position":"Руководитель департамента теплоэнергетических установок",
+"department":{"contentType":"Department","id":"1000029","name":"Департамент теплоэнергетических установок"},
+"uid":1018420,
+"gender":"male",
+"birthday":{"contentType":"DateOnly","year":1985,"month":5,"day":19},
+"contactInfo":[{"contentType":"ContactInfo","type":"email","value":"amirov@chelzeo.ru","comment":"","isMain":true,"subject":{"contentType":"Employee","id":"1000164"}},{"contentType":"ContactInfo","type":"phone","value":"+7 982 323-13-63","comment":"комментарий","isMain":false},{"contentType":"ContactInfo","type":"phone","value":"144","comment":"комментарий","isMain":false},{"contentType":"ContactInfo","type":"phone","value":"+7 900 069-53-18","comment":"комментарий","isMain":false}],
+"contactInfoCount":4,
+"isWorking":true,
+"nearestVacation":null,
+"isReadable":true,
+"isOnline":false,
+"lastOnline":{"contentType":"DateTime","value":"2024-02-16T11:54:00+00:00"},
+"canLogin":false,
+"avatar":{"contentType":"File","id":"1170416","name":"6ff14cd715a635d0761ebb814e3faf96.jpg","extension":"jpg","size":1207286,"path":"/attach/SdfFileM_File/File/496/237/4/6ff14cd715a635d0761ebb814e3faf96.jpg/user_avatar_%D0%90%D0%BC%D0%B8%D1%80%D0%BE%D0%B2%20%281%29.jpg","thumbnail":"/{width}x{height}/attach/SdfFileM_File/File/496/237/4/6ff14cd715a635d0761ebb814e3faf96.jpg"}
+}]
