@@ -22,9 +22,7 @@ namespace MPIC
                 })
                 .ConfigureServices((context, services) =>
                 {
-                    // Привязываем секцию MpicSettings к strongly-typed модели RootSettings
                     services.Configure<RootSettings>(context.Configuration.GetSection("MpicSettings"));
-
                     services.AddSingleton<NotificationManager>();
                     services.AddHostedService<MpicWorker>();
                 })

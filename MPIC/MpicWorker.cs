@@ -210,21 +210,6 @@ namespace MPIC
                             _notificationManager.RecordSuccess(mailboxId);
                         }
                     }
-                    else
-                    {
-                        // СДЕЛКА НАЙДЕНА, НО С ЗАДЕРЖКОЙ — предупреждение
-                        isWarning = true;
-                        resultMessage = $"Интеграция с ящиком {mailboxId} работает, но на создание сделки ушло {diffMinutes:F2} мин" +
-                            $" (больше порога в {maxTimeToCreateDealAfterLetter} мин)." +
-                            $" Письмо от {email.Sender} от {emailReceivedUtc:yyyy-MM-dd HH:mm:ss} UTC.";
-                        _logger.LogWarning(resultMessage);
-
-                        if (_notificationManager.ShouldSendFailureNotification(mailboxId, email.MessageId, email.Sender, emailReceivedUtc))
-                        {
-                            await emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailboxId}", resultMessage);
-                            _notificationManager.RecordFailure(mailboxId, email.MessageId, email.Sender, emailReceivedUtc);
-                        }
-                    }
                 }
 
                 if (!isDealCreated && !isWarning)
