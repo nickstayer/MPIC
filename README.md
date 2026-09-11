@@ -47,8 +47,6 @@
     "Username": "...",
     "Password": "...",
     "BaseApUrl": "https://crm.example.com/api/v3",
-    "ConnectionString": "server=...;database=...",
-    "LaunchTime": ["00:00", "08:00", "16:00"],
     "MaxTimeToCreateDealAfterLetter": 5,
     "RunIntervalMinutes": 60,
     "SkipReplyLetters": false,

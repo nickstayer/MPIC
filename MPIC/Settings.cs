@@ -24,11 +24,9 @@ namespace MPIC
     public class RootSettings
     {
         // ───── Мегаплан (API) ─────
-        public string[] LaunchTime { get; set; } = [];
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
         public string BaseApUrl { get; set; } = string.Empty;
-        public string ConnectionString { get; set; } = string.Empty;
 
         // ───── Мониторинг ─────
         public int MaxTimeToCreateDealAfterLetter { get; set; }

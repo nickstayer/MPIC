@@ -275,12 +275,9 @@ namespace MPIC
 
         private async Task<List<Deal>> GetLastDeals(DateTime targetDateTimeUtc, RootSettings settings)
         {
-            if (settings.LaunchTime == null
-                || settings.LaunchTime.Length == 0
-                || string.IsNullOrWhiteSpace(settings.Username)
+            if (string.IsNullOrWhiteSpace(settings.Username)
                 || string.IsNullOrWhiteSpace(settings.Password)
-                || string.IsNullOrWhiteSpace(settings.BaseApUrl)
-                || string.IsNullOrWhiteSpace(settings.ConnectionString))
+                || string.IsNullOrWhiteSpace(settings.BaseApUrl))
             {
                 _logger.LogCritical("Ошибка: некорректные настройки для доступа к API Мегаплана.");
                 return null;
