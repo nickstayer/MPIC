@@ -5,6 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UserSecretsId>mpic-email-crm-integration-2026</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,10 +22,18 @@
     <PackageReference Include="System.Text.Json" Version="10.0.12" />
   </ItemGroup>
 
-<ItemGroup>
-	<Content Include="..\Resources\**">
-		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</Content>
-</ItemGroup>
+  <!-- appsettings.json — копируется в выходную директорию -->
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Файлы Megaplan (токены, маппинги, контакты) — копируются в выходную директорию -->
+  <ItemGroup>
+    <Content Include="Megaplan\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
 </Project>

@@ -1,0 +1,222 @@
+[
+  {
+    "ClassPropertyName": "Id",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Number",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Name",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "ShortDescription",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Contractor",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Manager",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Price",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "State",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Result",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "TimeCreated",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "TimeUpdated",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Oplata1",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "DataOplati1",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "FakticheskayaDataOplati1",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Oplata2",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "DataOplati2",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "FakticheskayaDataOplati2",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Oplata3",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "DataOplati3",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "FakticheskayaDataOplati3",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Oplata4",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "PlaniruemayaDataOplati4",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "FakticheskayaDataOplati4",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "DataVipolneniyaKommUsl",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "SmetnayaPribilSUchetomNaloga",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "TrudozatratiChS",
+    "ClassPropertyType": "double",
+    "NullEquivalent": 0
+  },
+  {
+    "ClassPropertyName": "PoluchenaOplata1",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "PoluchenaOplata2",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "PoluchenaOplata3",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "PoluchenaOplata4",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "PlaniruemayaSummaOplati",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "VeroyatnostUspeha",
+    "ClassPropertyType": "int",
+    "NullEquivalent": 0
+  },
+  {
+    "ClassPropertyName": "KommercheskoePredlozhenie",
+    "ClassPropertyType": "List<nested-class>",
+    "NullEquivalent": []
+  },
+  {
+    "ClassPropertyName": "TipZayavki",
+    "ClassPropertyType": "string",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "Rentabelnost",
+    "ClassPropertyType": "double",
+    "NullEquivalent": 0.0
+  },
+  {
+    "ClassPropertyName": "DataGotovnostiOborudovaniya",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "OtzivPismoPoluchen",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "DataPolucheniyaOtzivaPisma",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "VideootzivPoluchen",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "DataPolucheniyaVideotziva",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "KeysProektaOformlen",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "DataOformleniyaKeysa",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  },
+  {
+    "ClassPropertyName": "ZakrivayushchieDokumentiPeredaniVBuh",
+    "ClassPropertyType": "bool",
+    "NullEquivalent": false
+  },
+  {
+    "ClassPropertyName": "DataPeredachiZakrivayushchihDokument",
+    "ClassPropertyType": "nested-class",
+    "NullEquivalent": null
+  }
+]

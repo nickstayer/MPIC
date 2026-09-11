@@ -30,13 +30,50 @@
 
 ## Конфигурация
 
-Все параметры работы приложения настраиваются в файле `appsettings.json`:
+Все параметры работы приложения настраиваются через **`Microsoft.Extensions.Configuration`** со следующими источниками (в порядке приоритета):
 
--   `MaxTimeToCreateDealAfterLetter`: Максимальное время (в минутах), которое может пройти между получением письма и созданием сделки, чтобы интеграция считалась успешной.
--   `RunIntervalMinutes`: Интервал (в минутах) между циклами проверки.
--   `SkipReplyLetters`: Если `true`, письма с темой, начинающейся на `Re:`/`Fwd:`/`R:` (ответы и пересылки), игнорируются. По умолчанию `false`.
--   `MonitoredMailboxes`: Список почтовых ящиков для мониторинга (логин, пароль).
--   `NotificationSettings`: Настройки SMTP-сервера для отправки уведомлений.
+1. **`appsettings.json`** — основной файл конфигурации (обязательный, в корне проекта).
+2. **User Secrets** — только в режиме Development (для локальной отладки).
+3. **Переменные окружения с префиксом `MPIC_`** — например `MPIC_MpicSettings__Username`.
+4. **Аргументы командной строки** — при ручном запуске.
+
+Все runtime-настройки находятся в секции `MpicSettings` файла `appsettings.json`.
+
+Пример структуры `appsettings.json`:
+
+```json
+{
+  "MpicSettings": {
+    "Username": "...",
+    "Password": "...",
+    "BaseApUrl": "https://crm.example.com/api/v3",
+    "ConnectionString": "server=...;database=...",
+    "LaunchTime": ["00:00", "08:00", "16:00"],
+    "MaxTimeToCreateDealAfterLetter": 5,
+    "RunIntervalMinutes": 60,
+    "SkipReplyLetters": false,
+    "MonitoredMailboxes": [
+      { "Username": "...", "Password": "..." }
+    ],
+    "NotificationSettings": {
+      "SmtpHost": "smtp.example.com",
+      "SmtpPort": 465,
+      "UseSsl": true,
+      "SenderEmail": "...",
+      "SenderPassword": "...",
+      "RecipientEmail": "..."
+    }
+  }
+}
+```
+
+### Дополнительные файлы конфигурации
+
+В папке `Megaplan\` (копируется в выходную директорию) находятся:
+
+- `Token/token.json` и `Token/token_exp_at.txt` — сохранённый токен авторизации Мегаплана.
+- `Mapping/deal_mapping_rules.json` и `Mapping/employee_mapping_rules.json` — правила маппинга полей для нормализации данных.
+- `Contacts/contacts.csv` — файл с контактными данными.
 
 ## Установка как Windows-служба
 
@@ -53,7 +90,7 @@ MPIC работает как **Windows-служба** (BackgroundService), ис�
     ```powershell
     dotnet publish C:\Git\MPIC\MPIC\MPIC.csproj -c Release -o C:\Services\MPIC
     ```
-    *Убедитесь, что `Resources\Megaplan\appsettings.json` скопирован в выходную папку.*
+    *`appsettings.json` и папка `Megaplan\` будут скопированы автоматически из проекта.*
 
 2.  Создайте службу:
     ```powershell

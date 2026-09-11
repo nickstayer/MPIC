@@ -5,6 +5,7 @@ using MegaplanSync.Core.Interfaces;
 using MegaplanSync.Logging;
 using MegaplanSync.Service;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
 
 namespace MPIC
@@ -12,57 +13,57 @@ namespace MPIC
     /// <summary>
     /// Фоновый сервис для мониторинга интеграции email → CRM (Мегаплан).
     /// Содержит основной цикл проверки, вынесенный из Program.cs.
+    /// Настройки получает из DI через IOptions&lt;RootSettings&gt;.
     /// </summary>
     public class MpicWorker : BackgroundService
     {
         private readonly ILogger _logger;
         private readonly NotificationManager _notificationManager;
-        private readonly EmailService _emailService;
-        private readonly RootSettings? _rootSettings;
+        private readonly RootSettings _settings;
 
-        public MpicWorker(NotificationManager notificationManager)
+        public MpicWorker(NotificationManager notificationManager, IOptions<RootSettings> options)
         {
             Logger.Initialize();
             _logger = Logger.Instance;
             _logger.OnLogFormattedMessage += Console.WriteLine;
             _notificationManager = notificationManager;
-
-            var serializer = new JsonHelper(_logger);
-            _rootSettings = serializer.LoadEntityFromFile<RootSettings>(Consts.APP_SETTINGS_FILE);
-            _emailService = new EmailService(_rootSettings?.NotificationSettings, _logger);
+            _settings = options.Value;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("Запуск MPIC Worker");
 
-            if (_rootSettings?.MonitoredMailboxes == null || _rootSettings.MonitoredMailboxes.Count == 0)
+            if (_settings.MonitoredMailboxes == null || _settings.MonitoredMailboxes.Count == 0)
             {
                 _logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
-                await _emailService.SendNotificationAsync("Критическая ошибка MPIC",
+                await SendNotificationAsync("Критическая ошибка MPIC",
                     "Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
                 return;
             }
 
             _logger.LogInformation("Инициализация MPIC Worker завершена. Запуск цикла проверки.");
 
+            // Создаём EmailService один раз на весь жизненный цикл
+            var emailService = new EmailService(_settings.NotificationSettings, _logger);
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogInformation("--- Начало цикла проверки ---");
 
-                foreach (var mailbox in _rootSettings.MonitoredMailboxes)
+                foreach (var mailbox in _settings.MonitoredMailboxes)
                 {
-                    await CheckMailboxIntegration(mailbox, _rootSettings);
+                    await CheckMailboxIntegration(mailbox, _settings, emailService, stoppingToken);
                 }
 
                 _logger.LogInformation("--- Конец цикла проверки ---");
 
-                if (_rootSettings.RunIntervalMinutes > 0 && !stoppingToken.IsCancellationRequested)
+                if (_settings.RunIntervalMinutes > 0 && !stoppingToken.IsCancellationRequested)
                 {
-                    _logger.LogInformation($"Следующий запуск через {_rootSettings.RunIntervalMinutes} мин.");
+                    _logger.LogInformation($"Следующий запуск через {_settings.RunIntervalMinutes} мин.");
                     try
                     {
-                        await Task.Delay(_rootSettings.RunIntervalMinutes * 60 * 1000, stoppingToken);
+                        await Task.Delay(_settings.RunIntervalMinutes * 60 * 1000, stoppingToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -93,7 +94,8 @@ namespace MPIC
             return rawValue.ToLowerInvariant();
         }
 
-        private async Task CheckMailboxIntegration(MailboxSettings mailbox, RootSettings rootSettings)
+        private async Task CheckMailboxIntegration(MailboxSettings mailbox, RootSettings rootSettings,
+            EmailService emailService, CancellationToken stoppingToken)
         {
             int maxTimeToCreateDealAfterLetter = rootSettings.MaxTimeToCreateDealAfterLetter;
             bool skipReplyLetters = rootSettings.SkipReplyLetters;
@@ -122,12 +124,12 @@ namespace MPIC
             var oldestEmailUtc = oldestEmailInBatch.ReceivedDate.ToUniversalTime().DateTime;
             var apiQueryTime = oldestEmailUtc.AddHours(-1);
 
-            var lastDeals = await GetLastDeals(apiQueryTime);
+            var lastDeals = await GetLastDeals(apiQueryTime, rootSettings);
             if (lastDeals == null)
             {
                 string errorMsg = $"Не удалось получить сделки из Мегаплана для проверки ящика {mailboxId}.";
                 _logger.LogError(errorMsg, logToConsole: true);
-                await _emailService.SendNotificationAsync($"Ошибка интеграции MPIC: {mailboxId}", errorMsg);
+                await emailService.SendNotificationAsync($"Ошибка интеграции MPIC: {mailboxId}", errorMsg);
                 return;
             }
 
@@ -202,7 +204,7 @@ namespace MPIC
                         if (_notificationManager.ShouldSendSuccessNotification(mailboxId))
                         {
                             _logger.LogInformation("Обнаружено восстановление работы интеграции. Отправка уведомления.");
-                            await _emailService.SendNotificationAsync($"Восстановление интеграции MPIC: {mailboxId}",
+                            await emailService.SendNotificationAsync($"Восстановление интеграции MPIC: {mailboxId}",
                                 $"Интеграция восстановлена. " +
                                 $"Последняя успешная сделка создана для письма от {email.Sender} в {dealTimeCreated:yyyy-MM-dd HH:mm:ss}.");
                             _notificationManager.RecordSuccess(mailboxId);
@@ -219,7 +221,7 @@ namespace MPIC
 
                         if (_notificationManager.ShouldSendFailureNotification(mailboxId, email.MessageId, email.Sender, emailReceivedUtc))
                         {
-                            await _emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailboxId}", resultMessage);
+                            await emailService.SendNotificationAsync($"Предупреждение интеграции MPIC: {mailboxId}", resultMessage);
                             _notificationManager.RecordFailure(mailboxId, email.MessageId, email.Sender, emailReceivedUtc);
                         }
                     }
@@ -234,7 +236,7 @@ namespace MPIC
 
                     if (_notificationManager.ShouldSendFailureNotification(mailboxId, email.MessageId, email.Sender, emailReceivedUtc))
                     {
-                        await _emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailboxId}", resultMessage);
+                        await emailService.SendNotificationAsync($"Сбой интеграции MPIC: {mailboxId}", resultMessage);
                         _notificationManager.RecordFailure(mailboxId, email.MessageId, email.Sender, emailReceivedUtc);
                     }
                 }
@@ -271,28 +273,37 @@ namespace MPIC
             return emailDetailsList;
         }
 
-        private async Task<List<Deal>> GetLastDeals(DateTime targetDateTimeUtc)
+        private async Task<List<Deal>> GetLastDeals(DateTime targetDateTimeUtc, RootSettings settings)
         {
-            var serializer = new JsonHelper(_logger);
-            var appSettings = serializer.LoadEntityFromFile<AppSettings>(Consts.APP_SETTINGS_FILE);
-            if (appSettings?.LaunchTime == null
-                || appSettings.LaunchTime.Length == 0
-                || string.IsNullOrWhiteSpace(appSettings.Username)
-                || string.IsNullOrWhiteSpace(appSettings.Password)
-                || string.IsNullOrWhiteSpace(appSettings.BaseApUrl)
-                || string.IsNullOrWhiteSpace(appSettings.ConnectionString))
+            if (settings.LaunchTime == null
+                || settings.LaunchTime.Length == 0
+                || string.IsNullOrWhiteSpace(settings.Username)
+                || string.IsNullOrWhiteSpace(settings.Password)
+                || string.IsNullOrWhiteSpace(settings.BaseApUrl)
+                || string.IsNullOrWhiteSpace(settings.ConnectionString))
             {
                 _logger.LogCritical("Ошибка: некорректные настройки для доступа к API Мегаплана.");
                 return null;
             }
+
             IApiClient apiClient = new MegaApiClient(logger: _logger, tokenFile: Consts.TOKEN_FILE_MEGAPLAN,
-                tokenExpAtFile: Consts.TOKEN_EXP_AT_FILE_MEGAPLAN, baseApiUrl: appSettings.BaseApUrl,
-                username: appSettings.Username, password: appSettings.Password);
+                tokenExpAtFile: Consts.TOKEN_EXP_AT_FILE_MEGAPLAN, baseApiUrl: settings.BaseApUrl,
+                username: settings.Username, password: settings.Password);
             IApiDataMapper apiDataMapper = new ApiDataMapper(_logger);
             ApiService apiService = new(_logger, apiClient, apiDataMapper);
 
             List<Deal> deals = await apiService.GetAndMapDealsUpdatedAfter(targetDateTimeUtc);
             return deals;
+        }
+
+        /// <summary>
+        /// Отправляет уведомление через EmailService, создавая его временно на основе настроек.
+        /// Используется для критических ошибок до входа в основной цикл.
+        /// </summary>
+        private async Task SendNotificationAsync(string subject, string body)
+        {
+            var emailService = new EmailService(_settings.NotificationSettings, _logger);
+            await emailService.SendNotificationAsync(subject, body);
         }
 
         public override void Dispose()
