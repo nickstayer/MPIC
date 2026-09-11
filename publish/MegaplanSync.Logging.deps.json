@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "MegaplanSync.Logging/1.0.0": {
+        "dependencies": {
+          "MegaplanSync.Core": "1.0.0"
+        },
+        "runtime": {
+          "MegaplanSync.Logging.dll": {}
+        }
+      },
+      "MegaplanSync.Core/1.0.0": {
+        "runtime": {
+          "MegaplanSync.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "MegaplanSync.Logging/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "MegaplanSync.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
