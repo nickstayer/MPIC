@@ -37,5 +37,54 @@
 -   `SkipReplyLetters`: Если `true`, письма с темой, начинающейся на `Re:`/`Fwd:`/`R:` (ответы и пересылки), игнорируются. По умолчанию `false`.
 -   `MonitoredMailboxes`: Список почтовых ящиков для мониторинга (логин, пароль).
 -   `NotificationSettings`: Настройки SMTP-сервера для отправки уведомлений.
--   `MaxTimeToCreateDealAfterLetter`: Максимальное время (в минутах), которое может пройти между получением письма и созданием сделки, чтобы интеграция считалась успешной.
--   `RunIntervalMinutes`: Интервал (в минутах) между циклами проверки.
+
+## Установка как Windows-служба
+
+MPIC работает как **Windows-служба** (BackgroundService), используя `Microsoft.Extensions.Hosting.WindowsServices`.
+
+### Предварительные требования
+
+-   .NET 10 Runtime на целевой машине (скачать: https://dotnet.microsoft.com/download/dotnet/10.0)
+-   Собранный бинарник (`MPIC\bin\Release\net10.0\publish\`) с обновлённым `appsettings.json`
+
+### Установка (через PowerShell от имени администратора)
+
+1.  Опубликуйте приложение:
+    ```powershell
+    dotnet publish C:\Git\MPIC\MPIC\MPIC.csproj -c Release -o C:\Services\MPIC
+    ```
+    *Убедитесь, что `Resources\Megaplan\appsettings.json` скопирован в выходную папку.*
+
+2.  Создайте службу:
+    ```powershell
+    New-Service -Name "MPIC" `
+        -BinaryPathName "C:\Services\MPIC\MPIC.exe" `
+        -DisplayName "MPIC — Mail to CRM Integration Monitor" `
+        -Description "Проверяет создание сделок в Мегаплане после получения писем и уведомляет о сбоях/восстановлении" `
+        -StartupType Automatic
+    ```
+
+3.  Запустите службу:
+    ```powershell
+    Start-Service -Name "MPIC"
+    ```
+
+4.  Проверьте статус:
+    ```powershell
+    Get-Service -Name "MPIC"
+    ```
+
+### Просмотр логов
+
+Логи пишутся в папку `Logs` рядом с исполняемым файлом службы (например `C:\Services\MPIC\Logs\app_YYYYMMDD.log`).
+
+По умолчанию логи также дублируются в консоль, но при работе как службы консоль недоступна — используйте файлы логов.
+
+### Удаление службы
+
+```powershell
+Stop-Service -Name "MPIC" -Force
+Remove-Service -Name "MPIC"
+```
+
+*Примечание: `Remove-Service` работает в PowerShell 7+; в Windows PowerShell (5.1) используйте `sc.exe delete MPIC`.*
