@@ -1,4 +1,4 @@
-﻿using MegaplanSync.ApiClient;
+using MegaplanSync.ApiClient;
 using MegaplanSync.Core;
 using MegaplanSync.Core.Interfaces;
 using MegaplanSync.Core.Models.Deal;
@@ -34,10 +34,8 @@ public class IntegrationTests
     public async Task Setup()
     {
         logger = new Mock<ILogger>().Object;
-        var serializer = new JsonHelper(logger);
-        appSettings = serializer.LoadEntityFromFile<AppSettings>(Consts.APP_SETTINGS_FILE);
-        if (appSettings?.LaunchTime == null
-            || appSettings.LaunchTime.Length == 0
+        appSettings = TestConfiguration.GetAppSettings();
+        if (appSettings.LaunchTime.Length == 0
             || string.IsNullOrWhiteSpace(appSettings.Username)
             || string.IsNullOrWhiteSpace(appSettings.Password)
             || string.IsNullOrWhiteSpace(appSettings.BaseApUrl)
@@ -45,7 +43,7 @@ public class IntegrationTests
         {
             throw new Exception("Ошибка: некорректные настройки.");
         }
-        dataAccess = new MySqlDataAccess(logger, Consts.CONNECTION_STRING_TEST);
+        dataAccess = new MySqlDataAccess(logger, TestConfiguration.GetConnectionString("Test"));
         dbDataMapper = new DbDataMapper(logger);
         dbService = new(logger, dataAccess, dbDataMapper);
         apiDataMapper = new ApiDataMapper(logger);
@@ -64,7 +62,7 @@ public class IntegrationTests
 
         // !!! начал работу с боевой БД
         var id = 36595;
-        var dataAccessOriginal = new MySqlDataAccess(logger, Consts.CONNECTION_STRING_REMOTE);
+        var dataAccessOriginal = new MySqlDataAccess(logger, TestConfiguration.GetConnectionString("Remote"));
         var dbDataMapperOriginal = new DbDataMapper(logger);
         DbService dbServiceOriginal = new(logger, dataAccessOriginal, dbDataMapperOriginal);
         var dealFromOriginalDb = await dbServiceOriginal.GetAndMapDeal(id);
@@ -358,7 +356,7 @@ public class IntegrationTests
         ILogger logger = Logger.Instance;
         logger.LogInformation("Сверка и корректировка сделок: активные бд - апи");
 
-        var dataAccessOriginal = new MySqlDataAccess(logger, Consts.CONNECTION_STRING_REMOTE);
+        var dataAccessOriginal = new MySqlDataAccess(logger, TestConfiguration.GetConnectionString("Remote"));
         var dbDataMapperOriginal = new DbDataMapper(logger);
         DbService dbServiceOriginal = new(logger, dataAccessOriginal, dbDataMapperOriginal);
         var activeDealsFromDb = await dbServiceOriginal.GetAndMapActiveDeals();
@@ -394,7 +392,7 @@ public class IntegrationTests
         ILogger logger = Logger.Instance;
         logger.LogInformation("Удаляю сделки из базы данных, которых нет в мегаплане (были удалены)");
 
-        var dataAccessOriginal = new MySqlDataAccess(logger, Consts.CONNECTION_STRING_REMOTE);
+        var dataAccessOriginal = new MySqlDataAccess(logger, TestConfiguration.GetConnectionString("Remote"));
         var dbDataMapperOriginal = new DbDataMapper(logger);
         DbService dbServiceOriginal = new(logger, dataAccessOriginal, dbDataMapperOriginal);
         var fileArr = File.ReadAllLines(dealsNotExistsInMegaplanFile);
@@ -420,7 +418,7 @@ public class IntegrationTests
         ILogger logger = Logger.Instance;
         logger.LogInformation("Отладка");
 
-        var dataAccessOriginal = new MySqlDataAccess(logger, Consts.CONNECTION_STRING_REMOTE);
+        var dataAccessOriginal = new MySqlDataAccess(logger, TestConfiguration.GetConnectionString("Remote"));
         var dbDataMapperOriginal = new DbDataMapper(logger);
         DbService dbServiceOriginal = new(logger, dataAccessOriginal, dbDataMapperOriginal);
         var apiClient = new MegaApiClient(logger: logger, tokenFile: Consts.TOKEN_FILE_MEGAPLAN,
@@ -481,7 +479,7 @@ public class IntegrationTests
         Logger.Initialize();
         ILogger logger = Logger.Instance;
 
-        var dataAccessOriginal = new MySqlDataAccess(logger, Consts.CONNECTION_STRING_REMOTE);
+        var dataAccessOriginal = new MySqlDataAccess(logger, TestConfiguration.GetConnectionString("Remote"));
         var dbDataMapperOriginal = new DbDataMapper(logger);
         DbService dbServiceOriginal = new(logger, dataAccessOriginal, dbDataMapperOriginal);
         var worker = new Worker(apiService, dbServiceOriginal, logger);

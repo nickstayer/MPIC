@@ -1,4 +1,4 @@
-﻿using MegaplanSync.ApiClient;
+using MegaplanSync.ApiClient;
 using MegaplanSync.Core;
 using MegaplanSync.Core.Models.Deal;
 using MegaplanSync.Core.Interfaces;
@@ -6,16 +6,19 @@ using MegaplanSync.Logging;
 using MegaplanSync.Service;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace MPIC;
 
 public class MpicWorker : BackgroundService
 {
     private readonly ILogger<MpicWorker> _logger;
+    private readonly RootSettings _settings;
 
-    public MpicWorker(ILogger<MpicWorker> logger)
+    public MpicWorker(ILogger<MpicWorker> logger, IOptions<RootSettings> settings)
     {
         _logger = logger;
+        _settings = settings.Value;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,20 +31,17 @@ public class MpicWorker : BackgroundService
         MegaplanSync.Core.Interfaces.ILogger logger = Logger.Instance;
         logger.LogInformation("Инициализация");
 
-        var serializer = new JsonHelper(logger);
-        var rootSettings = serializer.LoadEntityFromFile<RootSettings>(Consts.APP_SETTINGS_FILE);
-
-        var emailService = new EmailService(rootSettings?.NotificationSettings, logger);
+        var emailService = new EmailService(_settings?.NotificationSettings, logger);
         var notificationManager = new NotificationManager();
 
-        if (rootSettings == null
-            || rootSettings.MonitoredMailboxes == null
-            || rootSettings.MonitoredMailboxes.Count == 0)
+        if (_settings == null
+            || _settings.MonitoredMailboxes == null
+            || _settings.MonitoredMailboxes.Count == 0)
         {
-            logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
+            logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты. Проверьте appsettings.json, user secrets и переменные окружения.");
             await emailService.SendNotificationAsync(
                 "Критическая ошибка MPIC",
-                "Ошибка: настройки мониторинга не найдены или пусты в appsettings.json.");
+                "Ошибка: настройки мониторинга не найдены или пусты. Проверьте appsettings.json, user secrets и переменные окружения.");
 
             // В службе нельзя ждать ввода — просто завершаем работу.
             // Хост остановится, systemd/SCM зафиксируют завершение.
@@ -52,26 +52,25 @@ public class MpicWorker : BackgroundService
         {
             logger.LogInformation("--- Начало цикла проверки ---");
 
-            foreach (var mailbox in rootSettings.MonitoredMailboxes)
+            foreach (var mailbox in _settings.MonitoredMailboxes)
             {
                 if (stoppingToken.IsCancellationRequested)
                     break;
 
                 await CheckMailboxIntegration(
                     logger, emailService, notificationManager, mailbox,
-                    rootSettings.MaxTimeToCreateDealAfterLetter,
-                    stoppingToken);
+                    _settings, stoppingToken);
             }
 
             logger.LogInformation("--- Конец цикла проверки ---");
 
-            if (rootSettings.RunIntervalMinutes > 0)
+            if (_settings.RunIntervalMinutes > 0)
             {
-                logger.LogInformation($"Следующий запуск через {rootSettings.RunIntervalMinutes} мин.");
+                logger.LogInformation($"Следующий запуск через {_settings.RunIntervalMinutes} мин.");
                 try
                 {
                     await Task.Delay(
-                        rootSettings.RunIntervalMinutes * 60 * 1000,
+                        _settings.RunIntervalMinutes * 60 * 1000,
                         stoppingToken);
                 }
                 catch (TaskCanceledException)
@@ -95,12 +94,13 @@ public class MpicWorker : BackgroundService
         EmailService emailService,
         NotificationManager notificationManager,
         MailboxSettings mailbox,
-        int maxTimeToCreateDealAfterLetter,
+        RootSettings settings,
         CancellationToken stoppingToken)
     {
+        int maxTimeToCreateDealAfterLetter = settings.MaxTimeToCreateDealAfterLetter;
         logger.LogInformation($"--- Проверка интеграции для ящика {mailbox.Username} ---");
 
-        var lastLetter = await GetLastLetterInfo(logger, mailbox.Username, mailbox.Password);
+        var lastLetter = await GetLastLetterInfo(logger, mailbox.Username, mailbox.Password, settings.Imap);
         if (lastLetter == null)
         {
             string errorMsg = $"Не удалось получить последнее письмо для {mailbox.Username}.";
@@ -122,7 +122,7 @@ public class MpicWorker : BackgroundService
         // Внутренний цикл ожидания вместо рекурсии — корректно реагирует на остановку службы
         while (!stoppingToken.IsCancellationRequested)
         {
-            var lastDeals = await GetLastDeals(logger, targetDateTime);
+            var lastDeals = await GetLastDeals(logger, settings, targetDateTime);
             if (lastDeals == null)
             {
                 string errorMsg =
@@ -270,17 +270,16 @@ public class MpicWorker : BackgroundService
     }
 
     private static async Task<List<Deal>> GetLastDeals(
-        MegaplanSync.Core.Interfaces.ILogger logger, DateTime targetDateTime)
+        MegaplanSync.Core.Interfaces.ILogger logger,
+        RootSettings settings,
+        DateTime targetDateTime)
     {
-        var serializer = new JsonHelper(logger);
-        var appSettings = serializer.LoadEntityFromFile<AppSettings>(Consts.APP_SETTINGS_FILE);
-
-        if (appSettings?.LaunchTime == null
-            || appSettings.LaunchTime.Length == 0
-            || string.IsNullOrWhiteSpace(appSettings.Username)
-            || string.IsNullOrWhiteSpace(appSettings.Password)
-            || string.IsNullOrWhiteSpace(appSettings.BaseApUrl)
-            || string.IsNullOrWhiteSpace(appSettings.ConnectionString))
+        if (settings == null
+            || settings.LaunchTime.Length == 0
+            || string.IsNullOrWhiteSpace(settings.Username)
+            || string.IsNullOrWhiteSpace(settings.Password)
+            || string.IsNullOrWhiteSpace(settings.BaseApUrl)
+            || string.IsNullOrWhiteSpace(settings.ConnectionString))
         {
             logger.LogCritical("Ошибка: некорректные настройки для доступа к API Мегаплана.");
             return null;
@@ -290,9 +289,9 @@ public class MpicWorker : BackgroundService
             logger: logger,
             tokenFile: Consts.TOKEN_FILE_MEGAPLAN,
             tokenExpAtFile: Consts.TOKEN_EXP_AT_FILE_MEGAPLAN,
-            baseApiUrl: appSettings.BaseApUrl,
-            username: appSettings.Username,
-            password: appSettings.Password);
+            baseApiUrl: settings.BaseApUrl,
+            username: settings.Username,
+            password: settings.Password);
 
         IApiDataMapper apiDataMapper = new ApiDataMapper(logger);
         IDbDataMapper dbDataMapper = new DbDataMapper(logger);
@@ -303,9 +302,9 @@ public class MpicWorker : BackgroundService
     }
 
     private static async Task<EmailDetails> GetLastLetterInfo(
-        MegaplanSync.Core.Interfaces.ILogger logger, string username, string password)
+        MegaplanSync.Core.Interfaces.ILogger logger, string username, string password, ImapSettings imapSettings)
     {
-        var emailReader = new EmailReader(username, password);
+        var emailReader = new EmailReader(username, password, imapSettings);
         var emailDetails = await emailReader.GetLastEmailDetailsAsync();
 
         if (emailDetails != null)

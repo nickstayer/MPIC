@@ -1,38 +1,58 @@
-using System.Collections.Generic;
+namespace MPIC;
 
-namespace MPIC
+/// <summary>
+/// Почтовый ящик, monitored app'ом.
+/// </summary>
+public class MailboxSettings
 {
-    public class MailboxSettings
-    {
-        public string Username { get; set; }
-        public string Password { get; set; }
-    }
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
 
-    public class NotificationSettings
-    {
-        public string SmtpHost { get; set; }
-        public int SmtpPort { get; set; }
-        public bool UseSsl { get; set; }
-        public string SenderEmail { get; set; }
-        public string SenderPassword { get; set; }
-        public string RecipientEmail { get; set; }
-    }
+public class NotificationSettings
+{
+    public string SmtpHost { get; set; } = string.Empty;
+    public int SmtpPort { get; set; }
+    public bool UseSsl { get; set; }
+    public string SenderEmail { get; set; } = string.Empty;
+    public string SenderPassword { get; set; } = string.Empty;
+    public string RecipientEmail { get; set; } = string.Empty;
+}
 
-    public class RootSettings
-    {
-        // Properties that were in AppSettings
-        public string[] LaunchTime { get; set; }
-        public string Password { get; set; }
-        public string Username { get; set; }
-        public string BaseApUrl { get; set; }
-        public string ConnectionString { get; set; }
+/// <summary>
+/// Настройки подключения к IMAP-серверу для чтения писем.
+/// </summary>
+public class ImapSettings
+{
+    public string Host { get; set; } = "imap.yandex.ru";
+    public int Port { get; set; } = 993;
+    public bool UseSsl { get; set; } = true;
+    public string MailboxName { get; set; } = "INBOX";
+}
 
-        // Properties that were in MonitoringSettings
-        public int MaxTimeToCreateDealAfterLetter { get; set; }
-        public int RunIntervalMinutes { get; set; }
-        public List<MailboxSettings> MonitoredMailboxes { get; set; }
+/// <summary>
+/// Настройки MPIC. Читаются через IConfiguration из секции <see cref="SectionName"/>.
+/// Источники: appsettings.json → user secrets → переменные окружения.
+/// </summary>
+public class RootSettings
+{
+    public const string SectionName = "MPIC";
 
-        // Nested notification settings
-        public NotificationSettings NotificationSettings { get; set; }
-    }
+    // Настройки API Мегаплана
+    public string[] LaunchTime { get; set; } = [];
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string BaseApUrl { get; set; } = string.Empty;
+    public string ConnectionString { get; set; } = string.Empty;
+
+    // Настройки мониторинга
+    public int MaxTimeToCreateDealAfterLetter { get; set; }
+    public int RunIntervalMinutes { get; set; }
+    public List<MailboxSettings> MonitoredMailboxes { get; set; } = [];
+
+    // Настройки почтовых уведомлений
+    public NotificationSettings NotificationSettings { get; set; } = new();
+
+    // Настройки IMAP для чтения писем
+    public ImapSettings Imap { get; set; } = new();
 }

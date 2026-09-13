@@ -30,9 +30,52 @@
 
 ## Конфигурация
 
-Все параметры работы приложения настраиваются в файле `appsettings.json`:
+Все настройки читаются через `IConfiguration` из трёх источников (в порядке возрастания приоритета):
 
--   `MonitoredMailboxes`: Список почтовых ящиков для мониторинга (логин, пароль).
--   `NotificationSettings`: Настройки SMTP-сервера для отправки уведомлений.
--   `MaxTimeToCreateDealAfterLetter`: Максимальное время (в минутах), которое может пройти между получением письма и созданием сделки, чтобы интеграция считалась успешной.
--   `RunIntervalMinutes`: Интервал (в минутах) между циклами проверки.
+1. **appsettings.json** — один файл рядом с приложением (без вариантов для окружений);
+2. **User secrets** — локальные секреты разработчика (`dotnet user-secrets`);
+3. **Переменные окружения** — для продакшена (например `MPIC__MonitoredMailboxes__0__Password`).
+
+Пароли и строки подключения в репозиторий не коммитятся и в папке `Resources` не хранятся.
+
+### MPIC (монитор интеграции)
+
+Секция `MPIC` в `MPIC/appsettings.json`:
+
+- `MonitoredMailboxes`: Список почтовых ящиков для мониторинга (логин, пароль).
+- `NotificationSettings`: Настройки SMTP-сервера для отправки уведомлений.
+- `MaxTimeToCreateDealAfterLetter`: Максимальное время (в минутах), которое может пройти между получением письма и созданием сделки, чтобы интеграция считалась успешной.
+- `RunIntervalMinutes`: Интервал (в минутах) между циклами проверки.
+- `Username`, `Password`, `BaseApUrl`, `ConnectionString`: Доступ к API Мегаплана и БД.
+
+### MegaplanSync.Service (синхронизация)
+
+Секция `MegaplanSync` в `MegaplanSync/Resources/appsettings.json`:
+
+- `LaunchTime`: Расписание запусков синхронизации.
+- `Username`, `Password`, `BaseApUrl`, `ConnectionString`: Доступ к API Мегаплана и БД.
+
+### User secrets
+
+Локально секреты задаются для каждого проекта:
+
+```sh
+# MPIC
+cd MPIC
+dotnet user-secrets set "MPIC:MonitoredMailboxes:0:Password" "пароль_ящика"
+dotnet user-secrets set "MPIC:NotificationSettings:SenderPassword" "пароль_smtp"
+dotnet user-secrets set "MPIC:Username" "логин_мегаплан"
+dotnet user-secrets set "MPIC:Password" "пароль_мегаплан"
+dotnet user-secrets set "MPIC:ConnectionString" "server=...;database=..."
+
+# MegaplanSync.Service
+cd MegaplanSync/MegaplanSync.Service
+dotnet user-secrets set "MegaplanSync:Username" "логин_мегаплан"
+dotnet user-secrets set "MegaplanSync:Password" "пароль_мегаплан"
+dotnet user-secrets set "MegaplanSync:ConnectionString" "server=...;database=..."
+
+# Тесты (в т.ч. строки подключения к тестовой и боевой БД)
+cd MegaplanSync/MegaplanSync.Tests
+dotnet user-secrets set "MegaplanSync:ConnectionString:Test" "server=...;database=..._test"
+dotnet user-secrets set "MegaplanSync:ConnectionString:Remote" "server=...;database=..."
+```

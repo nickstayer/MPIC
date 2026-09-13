@@ -1,22 +1,16 @@
-﻿namespace MegaplanSync.Core;
+namespace MegaplanSync.Core;
 
 public class Consts
 {
     public static string TOKEN_FILE_MEGAPLAN = Path.Combine("Megaplan/Token", "token.json");
     public static string TOKEN_EXP_AT_FILE_MEGAPLAN = Path.Combine("Megaplan/Token", "token_exp_at.txt");
-    public static string APP_SETTINGS_FILE = Path.Combine("Megaplan", "appsettings.json");
     
     public const string TEST_FOLDER_NAME = "testdata";
 
-    //public const string BASE_API_URL = "https://crm.chelzeo.ru/api/v3";
-    //public const string USERNAME = "autodeal@chelzeo.ru";
-    //public const string PASSWORD = "IgbfddfgKJbfgf34";
-    //public const string USERNAME = "velichkina@chelzeo.ru";
-    //public const string PASSWORD = "GuhP12r?";
-    //public const string CONNECTION_STRING_LOCAL = "server=localhost;user id=megauser;password=23jfmnslSdf4;database=mp_chzeo";
-
-    public const string CONNECTION_STRING_REMOTE = "server=192.168.1.201;user id=megauser;password=23jfmnslSdf4;database=mp_chzeo";    
-    public const string CONNECTION_STRING_TEST = "server=localhost;user id=megauser;password=23jfmnslSdf4;database=mp_chzeo_test";
+    // Строки подключения и учётные данные хранятся в конфигурации:
+    // appsettings.json / user secrets / переменные окружения.
+    // Ключи конфигурации: MegaplanSync:ConnectionString, MegaplanSync:ConnectionStrings:Test,
+    // MegaplanSync:ConnectionStrings:Remote
 
     public const int JSON_ENTRIES_LIMIT = 100;
     public const long ID_BEFORE_START_ID = 0;

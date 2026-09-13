@@ -1,8 +1,9 @@
-﻿using MegaplanSync.ApiClient;
+using MegaplanSync.ApiClient;
 using MegaplanSync.Core;
 using MegaplanSync.Core.Interfaces;
 using MegaplanSync.DataAccess.MySql;
 using MegaplanSync.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace MegaplanSync.Service;
 
@@ -14,20 +15,22 @@ internal class Program
         ILogger logger = Logger.Instance;
         logger.OnLogFormattedMessage += Console.WriteLine;
         logger.LogInformation("Инициализация");
-        var serializer = new JsonHelper(logger);
-        var appSettings = serializer.LoadEntityFromFile<AppSettings>(Consts.APP_SETTINGS_FILE);
-        if (appSettings?.LaunchTime == null 
+
+        IConfiguration configuration = BuildConfiguration();
+
+        var appSettings = configuration.GetSection(AppSettings.SectionName).Get<AppSettings>();
+        if (appSettings == null
             || appSettings.LaunchTime.Length == 0
             || string.IsNullOrWhiteSpace(appSettings.Username)
             || string.IsNullOrWhiteSpace(appSettings.Password)
             || string.IsNullOrWhiteSpace(appSettings.BaseApUrl)
             || string.IsNullOrWhiteSpace(appSettings.ConnectionString))
         {
-            logger.LogCritical("Ошибка: некорректные настройки.");
+            logger.LogCritical("Ошибка: некорректные настройки. Проверьте appsettings.json, user secrets и переменные окружения.");
             return;
         }
         IApiClient apiClient = new MegaApiClient(logger: logger, tokenFile: Consts.TOKEN_FILE_MEGAPLAN,
-            tokenExpAtFile: Consts.TOKEN_EXP_AT_FILE_MEGAPLAN, baseApiUrl: appSettings.BaseApUrl, 
+            tokenExpAtFile: Consts.TOKEN_EXP_AT_FILE_MEGAPLAN, baseApiUrl: appSettings.BaseApUrl,
             username: appSettings.Username, password: appSettings.Password);
         IApiDataMapper apiDataMapper = new ApiDataMapper(logger);
         IDataAccess dataAccess = new MySqlDataAccess(logger, appSettings.ConnectionString);
@@ -70,8 +73,22 @@ internal class Program
                 logger.LogCritical($"Работа программы завершена c ошибкой: {ex.Message}");
                 // TODO: уведомление администратору
                 await Task.Delay(TimeSpan.FromHours(Consts.DEFAULT_DELAY_HOURS));
-            } 
+            }
         }
+    }
+
+    /// <summary>
+    /// Собирает IConfiguration из трех источников (в порядке возрастания приоритета):
+    /// appsettings.json → user secrets → переменные окружения.
+    /// </summary>
+    public static IConfiguration BuildConfiguration()
+    {
+        return new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+            .AddUserSecrets<Program>(optional: true)
+            .AddEnvironmentVariables()
+            .Build();
     }
 
     private static TimeSpan CalculateDelay(string[] scheduleTimes, ILogger logger)

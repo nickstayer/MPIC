@@ -1,4 +1,4 @@
-﻿using MegaplanSync.Core;
+using MegaplanSync.Core;
 using MegaplanSync.Core.Interfaces;
 using MegaplanSync.Core.Models;
 using MegaplanSync.Core.Models.Contractor;
@@ -23,10 +23,8 @@ public class DbServiceTests
     public void Setup()
     {
         logger = new Mock<ILogger>().Object;
-        var serializer = new JsonHelper(logger);
-        appSettings = serializer.LoadEntityFromFile<AppSettings>(Consts.APP_SETTINGS_FILE);
-        if (appSettings?.LaunchTime == null
-            || appSettings.LaunchTime.Length == 0
+        appSettings = TestConfiguration.GetAppSettings();
+        if (appSettings.LaunchTime.Length == 0
             || string.IsNullOrWhiteSpace(appSettings.Username)
             || string.IsNullOrWhiteSpace(appSettings.Password)
             || string.IsNullOrWhiteSpace(appSettings.BaseApUrl)
@@ -34,7 +32,7 @@ public class DbServiceTests
         {
             throw new Exception("Ошибка: некорректные настройки.");
         }
-        dataAccess = new MySqlDataAccess(logger, Consts.CONNECTION_STRING_TEST);
+        dataAccess = new MySqlDataAccess(logger, TestConfiguration.GetConnectionString("Test"));
         dbDataMapper = new DbDataMapper(logger);
         dbService = new(logger, dataAccess, dbDataMapper);
     }

@@ -22,16 +22,14 @@ namespace MegaplanSync.Tests
         public void Setup()
         {
             logger = new Mock<ILogger>().Object;
-            var serializer = new JsonHelper(logger);
-            var appSettings = serializer.LoadEntityFromFile<AppSettings>(Consts.APP_SETTINGS_FILE);
-            if (appSettings?.LaunchTime == null
-                || appSettings.LaunchTime.Length == 0
+            var appSettings = TestConfiguration.GetAppSettings();
+            if (appSettings.LaunchTime.Length == 0
                 || string.IsNullOrWhiteSpace(appSettings.Username)
                 || string.IsNullOrWhiteSpace(appSettings.Password)
                 || string.IsNullOrWhiteSpace(appSettings.BaseApUrl)
                 || string.IsNullOrWhiteSpace(appSettings.ConnectionString))
             {
-                throw new Exception("Ошибка: некорректные настройки.");
+                throw new Exception("РћС€РёР±РєР°: РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё.");
             }
             apiDataMapper = new ApiDataMapper(logger);
             apiClient = new MegaApiClient(logger: logger, tokenFile: Consts.TOKEN_FILE_MEGAPLAN,
@@ -39,7 +37,7 @@ namespace MegaplanSync.Tests
             apiService = new ApiService(logger, apiClient, apiDataMapper);
         }
 
-        // долгий тест
+        // РґРѕР»РіРёР№ С‚РµСЃС‚
         //[Test]
         public async Task GetAndMapDealsUpdatedAfterTest()
         {
@@ -54,7 +52,7 @@ namespace MegaplanSync.Tests
             Assert.That(actual, Is.EqualTo(expected));
         }
 
-        // долгий тест
+        // РґРѕР»РіРёР№ С‚РµСЃС‚
         [Test]
         public async Task GetAndMapActiveDealsAfterIdTest()
         {
@@ -82,7 +80,7 @@ namespace MegaplanSync.Tests
         [Test]
         public async Task GetAndMapLastCallInfosTest()
         {
-            // TODO: найти последний id: 471987 !!!
+            // TODO: РЅР°Р№С‚Рё РїРѕСЃР»РµРґРЅРёР№ id: 471987 !!!
             int limit = 100;
             var jsonPayload = MegaplanCallInfoPayload.GetPayload(471900);
             var lastEntries = await apiService.GetAndMapEntities<MegaplanCallInfo>(Consts.ENTITY_NAME_CALLINFO, jsonPayload);
@@ -164,10 +162,10 @@ namespace MegaplanSync.Tests
 
             if (contractorCompany == null) throw new Exception();
             if (contractorHuman == null) throw new Exception();
-            var actualCompany = contractorCompany.Name == "Коммунальные технологии";
-            var actualHuman = contractorHuman.LastName == "Ребров" 
-                && contractorHuman.FirstName == "Виктор" 
-                && contractorHuman.MiddleName == "Владимирович";
+            var actualCompany = contractorCompany.Name == "РљРѕРјРјСѓРЅР°Р»СЊРЅС‹Рµ С‚РµС…РЅРѕР»РѕРіРёРё";
+            var actualHuman = contractorHuman.LastName == "Р РµР±СЂРѕРІ" 
+                && contractorHuman.FirstName == "Р’РёРєС‚РѕСЂ" 
+                && contractorHuman.MiddleName == "Р’Р»Р°РґРёРјРёСЂРѕРІРёС‡";
             var actual = actualCompany && actualHuman;
             var expected = true;
             Assert.That(actual, Is.EqualTo(expected));

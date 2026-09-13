@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using MegaplanSync.Core.Interfaces;
 
@@ -111,6 +111,12 @@ public class Token
     {
         try
         {
+            string? tokenDir = Path.GetDirectoryName(Path.GetFullPath(_tokenFile));
+            if (!string.IsNullOrEmpty(tokenDir) && !Directory.Exists(tokenDir))
+            {
+                Directory.CreateDirectory(tokenDir);
+            }
+
             var tokenJson = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_tokenFile, tokenJson);
             File.WriteAllText(_tokenExpAtFile, ExpiresAt.ToString("o")); // "o" для ISO 8601
