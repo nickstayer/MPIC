@@ -39,11 +39,9 @@ public class RootSettings
     public const string SectionName = "MPIC";
 
     // Настройки API Мегаплана
-    public string[] LaunchTime { get; set; } = [];
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string BaseApUrl { get; set; } = string.Empty;
-    public string ConnectionString { get; set; } = string.Empty;
 
     // Настройки мониторинга
     public int MaxTimeToCreateDealAfterLetter { get; set; }

@@ -1,2 +1,2 @@
-Запрещено редактировать проекты: MegaplanSync.ApiClient, MegaplanSync.Core, MegaplanSync.Logging, MegaplanSync.Service
+Запрещено редактировать проекты: MegaplanSync.ApiClient, MegaplanSync.Core, MegaplanSync.Logging
 отвечать на русском

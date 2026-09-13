@@ -2,7 +2,5 @@
   <Project Path="MegaplanSync/MegaplanSync.ApiClient/MegaplanSync.ApiClient.csproj" />
   <Project Path="MegaplanSync/MegaplanSync.Core/MegaplanSync.Core.csproj" />
   <Project Path="MegaplanSync/MegaplanSync.Logging/MegaplanSync.Logging.csproj" />
-  <Project Path="MegaplanSync/MegaplanSync.Service/MegaplanSync.Service.csproj" />
-  <Project Path="MegaplanSync/MegaplanSync.DataAccess.MySql/MegaplanSync.DataAccess.MySql.csproj" />
   <Project Path="MPIC/MPIC.csproj" />
 </Solution>

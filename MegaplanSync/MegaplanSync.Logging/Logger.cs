@@ -1,7 +1,10 @@
-﻿using MegaplanSync.Core.Interfaces;
+using MegaplanSync.Core.Interfaces;
 
 namespace MegaplanSync.Logging;
 
+/// <summary>
+/// Потокобезопасный файловый логгер (singleton).
+/// </summary>
 public class Logger : ILogger
 {
     private static volatile Logger? _instance;
@@ -9,7 +12,7 @@ public class Logger : ILogger
 
     public string LogFilePath { get; private set; }
 
-    public event Action<string> OnLogFormattedMessage;
+    public event Action<string>? OnLogFormattedMessage;
 
     private Logger(string logFile)
     {
@@ -95,48 +98,14 @@ public class Logger : ILogger
 
     public void LogTrace(string message, bool logToFile = true, bool logToConsole = true) =>
         Log(LogLevel.Trace, message, logToFile: logToFile, logToConsole: logToConsole);
-    public void LogDebug(string message, bool logToFile = true, bool logToConsole = true) =>
+    public void LogDebug(string message, bool logToFile = true, bool logToConsole = false) =>
         Log(LogLevel.Debug, message, logToFile: logToFile, logToConsole: logToConsole);
     public void LogInformation(string message, bool logToFile = true, bool logToConsole = true) =>
         Log(LogLevel.Information, message, logToFile: logToFile, logToConsole: logToConsole);
     public void LogWarning(string message, bool logToFile = true, bool logToConsole = true) =>
         Log(LogLevel.Warning, message, logToFile: logToFile, logToConsole: logToConsole);
-    public void LogError(string message, Exception? exception = null, bool logToFile = true, bool logToConsole = true) =>
+    public void LogError(string message, Exception? exception = null, bool logToFile = true, bool logToConsole = false) =>
         Log(LogLevel.Error, message, exception, logToFile: logToFile, logToConsole: logToConsole);
     public void LogCritical(string message, Exception? exception = null, bool logToFile = true, bool logToConsole = true) =>
         Log(LogLevel.Critical, message, exception, logToFile: logToFile, logToConsole: logToConsole);
-
-
-    public void Chapter()
-    {
-        string separator = new string('-', 25);
-        try
-        {
-            lock (_lock)
-            {
-                File.AppendAllText(LogFilePath, separator + Environment.NewLine + Environment.NewLine);
-            }
-            OnLogFormattedMessage?.Invoke(separator);
-        }
-        catch (Exception ex)
-        {
-            OnLogFormattedMessage?.Invoke($"[ERROR] {DateTime.Now:HH:mm:ss}: ОШИБКА записи разделителя в лог-файл '{LogFilePath}': {ex.Message}");
-        }
-    }
-
-    public void Paragraph()
-    {
-        try
-        {
-            lock (_lock)
-            {
-                File.AppendAllText(LogFilePath, Environment.NewLine);
-            }
-            OnLogFormattedMessage?.Invoke(string.Empty);
-        }
-        catch (Exception ex)
-        {
-            OnLogFormattedMessage?.Invoke($"[ERROR] {DateTime.Now:HH:mm:ss}: ОШИБКА записи абзаца в лог-файл '{LogFilePath}': {ex.Message}");
-        }
-    }
 }

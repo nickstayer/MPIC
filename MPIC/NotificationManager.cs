@@ -17,27 +17,25 @@ namespace MPIC
 
         public NotificationManager()
         {
-            LoadState();
+            _state = LoadState();
         }
 
-        private void LoadState()
+        private static NotificationState LoadState()
         {
             if (File.Exists(StateFilePath))
             {
                 try
                 {
                     var json = File.ReadAllText(StateFilePath);
-                    _state = JsonSerializer.Deserialize<NotificationState>(json) ?? new NotificationState();
+                    return JsonSerializer.Deserialize<NotificationState>(json) ?? new NotificationState();
                 }
                 catch
                 {
-                    _state = new NotificationState();
+                    return new NotificationState();
                 }
             }
-            else
-            {
-                _state = new NotificationState();
-            }
+
+            return new NotificationState();
         }
 
         private void SaveState()
@@ -46,7 +44,7 @@ namespace MPIC
             File.WriteAllText(StateFilePath, json);
         }
 
-        public bool ShouldSendFailureNotification(string mailboxId, string messageId)
+        public bool ShouldSendFailureNotification(string mailboxId, string? messageId)
         {
             // Always notify if we can't track the message
             if (string.IsNullOrEmpty(messageId)) return true; 
@@ -61,7 +59,7 @@ namespace MPIC
             return true;
         }
 
-        public void RecordFailure(string mailboxId, string messageId)
+        public void RecordFailure(string mailboxId, string? messageId)
         {
             _state.BrokenMailboxes.Add(mailboxId);
 

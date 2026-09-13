@@ -4,11 +4,14 @@ using MegaplanSync.Core.Interfaces;
 
 namespace MegaplanSync.Core.Models;
 
+/// <summary>
+/// Токен доступа к API Мегаплана с кэшированием в файле.
+/// </summary>
 public class Token
 {
-    private readonly ILogger _logger;
-    private readonly string _tokenFile;
-    private readonly string _tokenExpAtFile;
+    private readonly ILogger _logger = null!;
+    private readonly string _tokenFile = string.Empty;
+    private readonly string _tokenExpAtFile = string.Empty;
 
     [JsonPropertyName("access_token")]
     public string AccessToken { get; set; } = string.Empty;
@@ -39,14 +42,9 @@ public class Token
         _tokenExpAtFile = tokenExpAtFile ?? throw new ArgumentNullException(nameof(tokenExpAtFile));
     }
 
-
     /// <summary>
     /// Получает новый токен аутентификации из API Мегаплана.
     /// </summary>
-    /// <param name="apiUrl">URL API для получения токена.</param>
-    /// <param name="username">Имя пользователя.</param>
-    /// <param name="password">Пароль пользователя.</param>
-    /// <returns>Новый объект Token или null в случае ошибки.</returns>
     private async Task<Token?> GetTokenFromApiAsync(string apiUrl, string username, string password)
     {
         _logger.LogDebug($"Получаю токен из API по адресу: {apiUrl}");
@@ -131,7 +129,6 @@ public class Token
     /// <summary>
     /// Читает кэшированный токен из файла.
     /// </summary>
-    /// <returns>Объект Token из кэша или null, если не удалось прочитать.</returns>
     private Token? ReadCachedToken()
     {
         if (!File.Exists(_tokenFile))
@@ -182,11 +179,8 @@ public class Token
     /// <summary>
     /// Проверяет, актуален ли кэшированный токен.
     /// </summary>
-    /// <returns>True, если токен актуален, иначе False.</returns>
     private bool IsTokenActual()
     {
-        // Здесь используем ExpiresAt из текущего экземпляра токена
-        // Если вы хотите проверять только по файлу tokenExpAtFile без загрузки всего токена:
         if (!File.Exists(_tokenExpAtFile))
         {
             _logger.LogDebug("Файл срока действия токена не найден, токен неактуален.");
@@ -197,8 +191,8 @@ public class Token
             var tokenExpDataStr = File.ReadAllText(_tokenExpAtFile);
             if (DateTime.TryParse(tokenExpDataStr, out DateTime tokenExpData))
             {
-                // Используем DateTime.UtcNow для сравнения, так как ExpiresAt сохраняется в UTC
-                bool isActual = DateTime.Now < tokenExpData.AddMinutes(-5); // 5 минут запас
+                // ExpiresAt сохраняется в UTC, сравниваем с локальным временем с запасом 5 минут
+                bool isActual = DateTime.Now < tokenExpData.AddMinutes(-5);
                 return isActual;
             }
             else
@@ -217,16 +211,10 @@ public class Token
     /// <summary>
     /// Основной метод для получения актуального AccessToken.
     /// </summary>
-    /// <param name="apiUrl">URL API для получения токена.</param>
-    /// <param name="username">Имя пользователя.</param>
-    /// <param name="password">Пароль пользователя.</param>
-    /// <returns>Актуальный AccessToken или пустая строка, если не удалось получить.</returns>
     public async Task<string> GetAccessTokenAsync(string baseUrl, string username, string password)
     {
         var apiUrl = baseUrl + "/auth/access_token";
-        Token? currentToken = null;
-
-        currentToken = ReadCachedToken();
+        Token? currentToken = ReadCachedToken();
 
         if (currentToken != null && IsTokenActual())
         {

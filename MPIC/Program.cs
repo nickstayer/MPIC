@@ -1,13 +1,6 @@
-using MegaplanSync.ApiClient;
-using MegaplanSync.Core;
-using MegaplanSync.Core.Models.Deal;
-using MegaplanSync.Core.Interfaces;
-using MegaplanSync.Logging;
-using MegaplanSync.Service;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace MPIC
 {

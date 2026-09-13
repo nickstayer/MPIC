@@ -1,6 +1,6 @@
+using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
-using MailKit;
 using MimeKit;
 
 namespace MPIC
@@ -20,13 +20,6 @@ namespace MPIC
             _userName = userName;
             _password = password;
             _imap = imap ?? new ImapSettings();
-        }
-
-        public EmailReader(string userName, string password)
-        {
-            _userName = userName;
-            _password = password;
-            _imap = new ImapSettings();
         }
 
         /// <summary>
@@ -82,7 +75,6 @@ namespace MPIC
             }
             catch (Exception ex)
             {
-                // In a real application, use a proper logging framework
                 Console.WriteLine($"An error occurred while fetching the email: {ex.Message}");
                 return null;
             }

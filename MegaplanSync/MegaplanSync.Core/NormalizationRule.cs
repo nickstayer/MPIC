@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
+using System.Text.Json.Serialization;
 
-namespace MegaplanSync.Core
+namespace MegaplanSync.Core;
+
+/// <summary>
+/// Правило нормализации: заменяет null/пустое значение свойства на NullEquivalent.
+/// </summary>
+public class NormalizationRule
 {
-    public class NormalizationRule
-    {
-        public string ClassPropertyName { get; set; }
-        public string ClassPropertyType { get; set; }
-        public JsonElement NullEquivalent { get; set; }
-    }
+    public string ClassPropertyName { get; set; } = string.Empty;
+    public string ClassPropertyType { get; set; } = string.Empty;
+    public JsonElement NullEquivalent { get; set; }
 }

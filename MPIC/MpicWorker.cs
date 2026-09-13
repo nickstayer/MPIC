@@ -1,9 +1,8 @@
 using MegaplanSync.ApiClient;
 using MegaplanSync.Core;
-using MegaplanSync.Core.Models.Deal;
 using MegaplanSync.Core.Interfaces;
+using MegaplanSync.Core.Models.Deal;
 using MegaplanSync.Logging;
-using MegaplanSync.Service;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,18 +24,16 @@ public class MpicWorker : BackgroundService
     {
         _logger.LogInformation("Инициализация службы MPIC");
 
-        // ВНИМАНИЕ: здесь используется ваш собственный ILogger (MegaplanSync.Core.Interfaces..ILogger)
+        // ВНИМАНИЕ: здесь используется собственный ILogger (MegaplanSync.Core.Interfaces.ILogger)
         // для сохранения существующей логики. Стандартный Microsoft.Extensions.Logging.ILogger
         // используется только для сообщений о жизненном цикле службы.
         MegaplanSync.Core.Interfaces.ILogger logger = Logger.Instance;
         logger.LogInformation("Инициализация");
 
-        var emailService = new EmailService(_settings?.NotificationSettings, logger);
+        var emailService = new EmailService(_settings.NotificationSettings, logger);
         var notificationManager = new NotificationManager();
 
-        if (_settings == null
-            || _settings.MonitoredMailboxes == null
-            || _settings.MonitoredMailboxes.Count == 0)
+        if (_settings.MonitoredMailboxes.Count == 0)
         {
             logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты. Проверьте appsettings.json, user secrets и переменные окружения.");
             await emailService.SendNotificationAsync(
@@ -133,7 +130,7 @@ public class MpicWorker : BackgroundService
                 return;
             }
 
-            bool isDealCreated = TryHandleDealFound(
+            bool isDealCreated = await TryHandleDealFound(
                 logger, emailService, notificationManager,
                 mailbox, lastLetter, lastDeals,
                 targetDateTime, maxTimeToCreateDealAfterLetter);
@@ -187,7 +184,7 @@ public class MpicWorker : BackgroundService
     /// Пытается найти подходящую сделку и обработать успех/предупреждение.
     /// Возвращает true, если сделка найдена и обработана (успех или слишком долгое создание).
     /// </summary>
-    private static bool TryHandleDealFound(
+    private static async Task<bool> TryHandleDealFound(
         MegaplanSync.Core.Interfaces.ILogger logger,
         EmailService emailService,
         NotificationManager notificationManager,
@@ -197,18 +194,15 @@ public class MpicWorker : BackgroundService
         DateTime targetDateTime,
         int maxTimeToCreateDealAfterLetter)
     {
-        var contractorEmailInLastDeals = lastDeals
+        var contractorEmailsInLastDeals = lastDeals
             .Where(d => d?.Contractor?.ContactInfo != null)
-            .SelectMany(d => d.Contractor.ContactInfo)
+            .SelectMany(d => d.Contractor!.ContactInfo!)
             .Where(ci => !string.IsNullOrEmpty(ci?.Value) && ci.Value.Contains('@'))
-            .Select(ci => ci.Value)
+            .Select(ci => ci.Value!)
             .ToList();
 
-        var match = contractorEmailInLastDeals
-            .Where(d => d == lastLetter.Sender)
-            .ToList();
-
-        if (!match.Any())
+        if (lastLetter.Sender == null
+            || !contractorEmailsInLastDeals.Contains(lastLetter.Sender))
             return false;
 
         var dealsFromSender = lastDeals.Where(d =>
@@ -216,13 +210,13 @@ public class MpicWorker : BackgroundService
 
         var bestMatchDeal = dealsFromSender
             .Where(d => d.TimeCreated != null)
-            .OrderBy(d => d.TimeCreated.Value)
+            .OrderBy(d => d.TimeCreated!.Value)
             .FirstOrDefault();
 
         if (bestMatchDeal == null)
             return false;
 
-        var dealTimeCreated = bestMatchDeal.TimeCreated.Value;
+        var dealTimeCreated = bestMatchDeal.TimeCreated!.Value;
         var diff = (dealTimeCreated - targetDateTime).TotalMinutes;
 
         if (diff < maxTimeToCreateDealAfterLetter)
@@ -237,13 +231,10 @@ public class MpicWorker : BackgroundService
             {
                 logger.LogInformation(
                     "Обнаружено восстановление работы интеграции. Отправка уведомления.");
-                // Fire-and-forget здесь неуместен, но метод синхронный по сигнатуре.
-                // Если нужно — сделайте TryHandleDealFound async и await здесь.
-                emailService.SendNotificationAsync(
+                await emailService.SendNotificationAsync(
                     $"Восстановление интеграции MPIC: {mailbox.Username}",
                     $"Интеграция восстановлена. Последняя успешная сделка создана " +
-                    $"для письма от {lastLetter.Sender} в {dealTimeCreated}.")
-                    .GetAwaiter().GetResult();
+                    $"для письма от {lastLetter.Sender} в {dealTimeCreated}.");
                 notificationManager.RecordSuccess(mailbox.Username);
             }
 
@@ -259,9 +250,8 @@ public class MpicWorker : BackgroundService
         if (notificationManager.ShouldSendFailureNotification(
                 mailbox.Username, lastLetter.MessageId))
         {
-            emailService.SendNotificationAsync(
-                $"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg)
-                .GetAwaiter().GetResult();
+            await emailService.SendNotificationAsync(
+                $"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
             notificationManager.RecordFailure(
                 mailbox.Username, lastLetter.MessageId);
         }
@@ -269,17 +259,15 @@ public class MpicWorker : BackgroundService
         return true;
     }
 
-    private static async Task<List<Deal>> GetLastDeals(
+    private static async Task<List<Deal>?> GetLastDeals(
         MegaplanSync.Core.Interfaces.ILogger logger,
         RootSettings settings,
         DateTime targetDateTime)
     {
         if (settings == null
-            || settings.LaunchTime.Length == 0
             || string.IsNullOrWhiteSpace(settings.Username)
             || string.IsNullOrWhiteSpace(settings.Password)
-            || string.IsNullOrWhiteSpace(settings.BaseApUrl)
-            || string.IsNullOrWhiteSpace(settings.ConnectionString))
+            || string.IsNullOrWhiteSpace(settings.BaseApUrl))
         {
             logger.LogCritical("Ошибка: некорректные настройки для доступа к API Мегаплана.");
             return null;
@@ -294,14 +282,13 @@ public class MpicWorker : BackgroundService
             password: settings.Password);
 
         IApiDataMapper apiDataMapper = new ApiDataMapper(logger);
-        IDbDataMapper dbDataMapper = new DbDataMapper(logger);
         ApiService apiService = new(logger, apiClient, apiDataMapper);
 
         List<Deal> deals = await apiService.GetAndMapDealsUpdatedAfter(targetDateTime);
         return deals;
     }
 
-    private static async Task<EmailDetails> GetLastLetterInfo(
+    private static async Task<EmailDetails?> GetLastLetterInfo(
         MegaplanSync.Core.Interfaces.ILogger logger, string username, string password, ImapSettings imapSettings)
     {
         var emailReader = new EmailReader(username, password, imapSettings);

@@ -6,6 +6,15 @@
 
 Основная задача — автоматически отслеживать, создаются ли в Мегаплане сделки после получения писем от клиентов, и оперативно уведомлять ответственных лиц о сбоях и восстановлении работы интеграции.
 
+## Структура решения
+
+- **MPIC** — основной проект (служба мониторинга, точка входа).
+- **MegaplanSync.Core** — минимальная библиотека для работы с API Мегаплана: клиент (`MegaApiClient`), сервис чтения сделок (`ApiService`), модели `Deal`/`Contractor`, нормализатор данных.
+- **MegaplanSync.ApiClient** — HTTP-клиент API Мегаплана с кэшированием токена.
+- **MegaplanSync.Logging** — файловый логгер.
+
+`MegaplanSync` присутствует в решении только в объёме, необходимом MPIC для получения сделок из Мегаплана.
+
 ## Принцип работы
 
 1.  **Периодическая проверка**: Приложение запускается через заданные интервалы времени.
@@ -38,44 +47,28 @@
 
 Пароли и строки подключения в репозиторий не коммитятся и в папке `Resources` не хранятся.
 
-### MPIC (монитор интеграции)
-
-Секция `MPIC` в `MPIC/appsettings.json`:
+### Секция `MPIC` (MPIC/appsettings.json)
 
 - `MonitoredMailboxes`: Список почтовых ящиков для мониторинга (логин, пароль).
 - `NotificationSettings`: Настройки SMTP-сервера для отправки уведомлений.
+- `Imap`: Настройки IMAP-сервера для чтения писем.
 - `MaxTimeToCreateDealAfterLetter`: Максимальное время (в минутах), которое может пройти между получением письма и созданием сделки, чтобы интеграция считалась успешной.
 - `RunIntervalMinutes`: Интервал (в минутах) между циклами проверки.
-- `Username`, `Password`, `BaseApUrl`, `ConnectionString`: Доступ к API Мегаплана и БД.
-
-### MegaplanSync.Service (синхронизация)
-
-Секция `MegaplanSync` в `MegaplanSync/Resources/appsettings.json`:
-
-- `LaunchTime`: Расписание запусков синхронизации.
-- `Username`, `Password`, `BaseApUrl`, `ConnectionString`: Доступ к API Мегаплана и БД.
+- `Username`, `Password`, `BaseApUrl`: Доступ к API Мегаплана (задаются в user secrets / переменных окружения).
 
 ### User secrets
 
-Локально секреты задаются для каждого проекта:
+Локально секреты задаются для проекта MPIC:
 
 ```sh
-# MPIC
 cd MPIC
 dotnet user-secrets set "MPIC:MonitoredMailboxes:0:Password" "пароль_ящика"
 dotnet user-secrets set "MPIC:NotificationSettings:SenderPassword" "пароль_smtp"
 dotnet user-secrets set "MPIC:Username" "логин_мегаплан"
 dotnet user-secrets set "MPIC:Password" "пароль_мегаплан"
-dotnet user-secrets set "MPIC:ConnectionString" "server=...;database=..."
-
-# MegaplanSync.Service
-cd MegaplanSync/MegaplanSync.Service
-dotnet user-secrets set "MegaplanSync:Username" "логин_мегаплан"
-dotnet user-secrets set "MegaplanSync:Password" "пароль_мегаплан"
-dotnet user-secrets set "MegaplanSync:ConnectionString" "server=...;database=..."
-
-# Тесты (в т.ч. строки подключения к тестовой и боевой БД)
-cd MegaplanSync/MegaplanSync.Tests
-dotnet user-secrets set "MegaplanSync:ConnectionString:Test" "server=...;database=..._test"
-dotnet user-secrets set "MegaplanSync:ConnectionString:Remote" "server=...;database=..."
 ```
+
+## Ресурсы
+
+- `Resources/Megaplan/Mapping/deal_mapping_rules.json` — правила нормализации полей сделки (копируются в выходную папку при сборке).
+- Кэш токена Мегаплана пишется в `Megaplan/Token/` рядом с исполняемым файлом и не коммитится.

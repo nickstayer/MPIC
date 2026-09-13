@@ -1,7 +1,6 @@
 using MailKit.Net.Smtp;
 using MimeKit;
 using MegaplanSync.Core.Interfaces;
-using System.Threading.Tasks;
 
 namespace MPIC
 {
@@ -45,9 +44,9 @@ namespace MPIC
                     _logger.LogInformation($"Уведомление успешно отправлено на {_settings.RecipientEmail}");
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                _logger.LogError($"Ошибка при отправке email-уведомления: {ex.ToString()}");
+                _logger.LogError($"Ошибка при отправке email-уведомления: {ex}");
             }
         }
     }
