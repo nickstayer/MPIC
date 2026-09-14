@@ -143,3 +143,5 @@ Resources/data/
 # Кэш токена Мегаплана (runtime-состояние)
 **/Megaplan/Token/token.json
 **/Megaplan/Token/token_exp_at.txt
+
+publish

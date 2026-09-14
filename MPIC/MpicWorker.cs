@@ -24,9 +24,6 @@ public class MpicWorker : BackgroundService
     {
         _logger.LogInformation("Инициализация службы MPIC");
 
-        // ВНИМАНИЕ: здесь используется собственный ILogger (MegaplanSync.Core.Interfaces.ILogger)
-        // для сохранения существующей логики. Стандартный Microsoft.Extensions.Logging.ILogger
-        // используется только для сообщений о жизненном цикле службы.
         MegaplanSync.Core.Interfaces.ILogger logger = Logger.Instance;
         logger.LogInformation("Инициализация");
 
@@ -39,9 +36,6 @@ public class MpicWorker : BackgroundService
             await emailService.SendNotificationAsync(
                 "Критическая ошибка MPIC",
                 "Ошибка: настройки мониторинга не найдены или пусты. Проверьте appsettings.json, user secrets и переменные окружения.");
-
-            // В службе нельзя ждать ввода — просто завершаем работу.
-            // Хост остановится, systemd/SCM зафиксируют завершение.
             return;
         }
 
@@ -242,19 +236,19 @@ public class MpicWorker : BackgroundService
         }
 
         // Сделка создана, но слишком поздно — трактуем как сбой
-        string warningMsg =
-            $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки " +
-            $"ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
-        logger.LogWarning(warningMsg);
+        //string warningMsg =
+        //    $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки " +
+        //    $"ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
+        //logger.LogWarning(warningMsg);
 
-        if (notificationManager.ShouldSendFailureNotification(
-                mailbox.Username, lastLetter.MessageId))
-        {
-            await emailService.SendNotificationAsync(
-                $"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
-            notificationManager.RecordFailure(
-                mailbox.Username, lastLetter.MessageId);
-        }
+        //if (notificationManager.ShouldSendFailureNotification(
+        //        mailbox.Username, lastLetter.MessageId))
+        //{
+        //    await emailService.SendNotificationAsync(
+        //        $"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
+        //    notificationManager.RecordFailure(
+        //        mailbox.Username, lastLetter.MessageId);
+        //}
 
         return true;
     }
