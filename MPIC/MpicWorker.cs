@@ -130,7 +130,11 @@ public class MpicWorker : BackgroundService
                 targetDateTime, maxTimeToCreateDealAfterLetter);
 
             if (isDealCreated)
+            {
+                logger.LogInformation("Сделка из письма была создана.");
                 return;
+            }
+                
 
             var timeSinceLetter = (DateTime.Now - targetDateTime).TotalMinutes;
 
@@ -208,46 +212,6 @@ public class MpicWorker : BackgroundService
 
         if (bestMatchDeal == null)
             return false;
-
-        //var dealTimeCreated = bestMatchDeal.TimeCreated!.Value;
-        //var diff = (dealTimeCreated - targetDateTime).TotalMinutes;
-
-        //if (diff < maxTimeToCreateDealAfterLetter)
-        //{
-        //    string successMsg =
-        //        $"Интеграция с ящиком {mailbox.Username} работает исправно. " +
-        //        $"Письмо получено в {targetDateTime}. Сделка создана в {dealTimeCreated}, " +
-        //        $"через {diff:F2} мин.";
-        //    logger.LogInformation(successMsg);
-
-        //    if (notificationManager.ShouldSendSuccessNotification(mailbox.Username))
-        //    {
-        //        logger.LogInformation(
-        //            "Обнаружено восстановление работы интеграции. Отправка уведомления.");
-        //        await emailService.SendNotificationAsync(
-        //            $"Восстановление интеграции MPIC: {mailbox.Username}",
-        //            $"Интеграция восстановлена. Последняя успешная сделка создана " +
-        //            $"для письма от {lastLetter.Sender} в {dealTimeCreated}.");
-        //        notificationManager.RecordSuccess(mailbox.Username);
-        //    }
-
-        //    return true;
-        //}
-
-        //Сделка создана, но слишком поздно — трактуем как сбой
-        //string warningMsg =
-        //    $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки " +
-        //    $"ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
-        //logger.LogWarning(warningMsg);
-
-        //if (notificationManager.ShouldSendFailureNotification(
-        //        mailbox.Username, lastLetter.MessageId))
-        //{
-        //    await emailService.SendNotificationAsync(
-        //        $"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
-        //    notificationManager.RecordFailure(
-        //        mailbox.Username, lastLetter.MessageId);
-        //}
 
         return true;
     }
