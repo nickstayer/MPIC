@@ -144,4 +144,8 @@ Resources/data/
 **/Megaplan/Token/token.json
 **/Megaplan/Token/token_exp_at.txt
 
+# Хранилище обработанных писем MPIC (runtime-состояние)
+**/processed_letters.json
+**/processed_letters.json.tmp
+
 publish

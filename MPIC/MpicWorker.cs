@@ -29,6 +29,7 @@ public class MpicWorker : BackgroundService
 
         var emailService = new EmailService(_settings.NotificationSettings, logger);
         var notificationManager = new NotificationManager();
+        var processedLetterStore = new ProcessedLetterStore();
 
         if (_settings.MonitoredMailboxes.Count == 0)
         {
@@ -49,7 +50,7 @@ public class MpicWorker : BackgroundService
                     break;
 
                 await CheckMailboxIntegration(
-                    logger, emailService, notificationManager, mailbox,
+                    logger, emailService, notificationManager, processedLetterStore, mailbox,
                     _settings, stoppingToken);
             }
 
@@ -84,6 +85,7 @@ public class MpicWorker : BackgroundService
         MegaplanSync.Core.Interfaces.ILogger logger,
         EmailService emailService,
         NotificationManager notificationManager,
+        ProcessedLetterStore processedLetterStore,
         MailboxSettings mailbox,
         RootSettings settings,
         CancellationToken stoppingToken)
@@ -106,6 +108,17 @@ public class MpicWorker : BackgroundService
             logger.LogWarning(
                 "⚠️Не удалось получить Message-ID для последнего письма. " +
                 "Уведомления для этого письма не будут отслеживаться.");
+        }
+
+        // Письмо уже проверялось в прошлые циклы (новых писем не поступало) —
+        // прекращаем цикл работы с этим ящиком, чтобы не нагружать IMAP и API.
+        if (processedLetterStore.IsAlreadyProcessed(
+                mailbox.Username, lastLetter.MessageId, lastLetter.ReceivedDate))
+        {
+            logger.LogInformation(
+                $"⚠️Письмо от {lastLetter.Sender} (Message-ID: {lastLetter.MessageId ?? "нет"}) " +
+                $"уже обработано в предыдущем цикле. Прекращаю цикл работы с ящиком {mailbox.Username}.");
+            return;
         }
 
         var targetDateTime = lastLetter.ReceivedDate.ToLocalTime().DateTime;
@@ -133,9 +146,12 @@ public class MpicWorker : BackgroundService
             if (isDealCreated)
             {
                 logger.LogInformation("✅Сделка из письма была создана.");
+                processedLetterStore.MarkProcessed(
+                    mailbox.Username, lastLetter, "deal_found");
+                logger.LogInformation("Внес в обработанные");
                 return;
             }
-                
+
 
             var timeSinceLetter = (DateTime.Now - targetDateTime).TotalMinutes;
 
@@ -173,6 +189,10 @@ public class MpicWorker : BackgroundService
                 notificationManager.RecordFailure(
                     mailbox.Username, lastLetter.MessageId);
             }
+
+            processedLetterStore.MarkProcessed(
+                mailbox.Username, lastLetter, "no_deal");
+            logger.LogInformation("Внес в обработанные");
 
             return;
         }
