@@ -124,13 +124,13 @@ public class MpicWorker : BackgroundService
                 return;
             }
 
-            bool isDealCreated = await TryHandleDealFound(
-                logger, emailService, notificationManager,
-                mailbox, lastLetter, lastDeals,
-                targetDateTime, maxTimeToCreateDealAfterLetter);
+            //bool isDealCreated = await TryHandleDealFound(
+            //    logger, emailService, notificationManager,
+            //    mailbox, lastLetter, lastDeals,
+            //    targetDateTime, maxTimeToCreateDealAfterLetter);
 
-            if (isDealCreated)
-                return;
+            //if (isDealCreated)
+            //    return;
 
             var timeSinceLetter = (DateTime.Now - targetDateTime).TotalMinutes;
 
@@ -156,9 +156,8 @@ public class MpicWorker : BackgroundService
 
             // Время вышло, сделки нет — фиксируем сбой
             string failMsg =
-                $"ИНТЕГРАЦИЯ НЕ РАБОТАЕТ: Для ящика {mailbox.Username} " +
-                $"не найдено ни одной сделки, созданной после письма " +
-                $"от <b>{lastLetter.Sender}</b>, полученного в {targetDateTime}.";
+                $"Сделка не была создана. Источник {mailbox.Username}, " +
+                $"отправитель: <b>{lastLetter.Sender}</b>, получено в {targetDateTime}.";
             logger.LogError(failMsg, logToConsole: true);
 
             if (notificationManager.ShouldSendFailureNotification(
@@ -235,20 +234,20 @@ public class MpicWorker : BackgroundService
             return true;
         }
 
-        // Сделка создана, но слишком поздно — трактуем как сбой
-        //string warningMsg =
-        //    $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки " +
-        //    $"ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
-        //logger.LogWarning(warningMsg);
+        //Сделка создана, но слишком поздно — трактуем как сбой
+        string warningMsg =
+            $"Интеграция с ящиком {mailbox.Username} работает, но на создание сделки " +
+            $"ушло {diff:F2} минут (больше порога в {maxTimeToCreateDealAfterLetter} мин).";
+        logger.LogWarning(warningMsg);
 
-        //if (notificationManager.ShouldSendFailureNotification(
-        //        mailbox.Username, lastLetter.MessageId))
-        //{
-        //    await emailService.SendNotificationAsync(
-        //        $"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
-        //    notificationManager.RecordFailure(
-        //        mailbox.Username, lastLetter.MessageId);
-        //}
+        if (notificationManager.ShouldSendFailureNotification(
+                mailbox.Username, lastLetter.MessageId))
+        {
+            await emailService.SendNotificationAsync(
+                $"Предупреждение интеграции MPIC: {mailbox.Username}", warningMsg);
+            notificationManager.RecordFailure(
+                mailbox.Username, lastLetter.MessageId);
+        }
 
         return true;
     }
