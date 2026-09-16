@@ -32,7 +32,7 @@ public class MpicWorker : BackgroundService
 
         if (_settings.MonitoredMailboxes.Count == 0)
         {
-            logger.LogCritical("Ошибка: настройки мониторинга не найдены или пусты. Проверьте appsettings.json, user secrets и переменные окружения.");
+            logger.LogCritical("❌Ошибка: настройки мониторинга не найдены или пусты. Проверьте appsettings.json, user secrets и переменные окружения.");
             await emailService.SendNotificationAsync(
                 "Критическая ошибка MPIC",
                 "Ошибка: настройки мониторинга не найдены или пусты. Проверьте appsettings.json, user secrets и переменные окружения.");
@@ -72,12 +72,12 @@ public class MpicWorker : BackgroundService
             }
             else
             {
-                logger.LogInformation("Интервал запуска не настроен или равен 0. Завершение работы.");
+                logger.LogInformation("❌Интервал запуска не настроен или равен 0. Завершение работы.");
                 break;
             }
         }
 
-        logger.LogInformation("Служба MPIC остановлена.");
+        logger.LogInformation("❌Служба MPIC остановлена.");
     }
 
     private static async Task CheckMailboxIntegration(
@@ -94,7 +94,7 @@ public class MpicWorker : BackgroundService
         var lastLetter = await GetLastLetterInfo(logger, mailbox.Username, mailbox.Password, settings.Imap);
         if (lastLetter == null)
         {
-            string errorMsg = $"Не удалось получить последнее письмо для {mailbox.Username}.";
+            string errorMsg = $"❌Не удалось получить последнее письмо для {mailbox.Username}.";
             logger.LogError(errorMsg, logToConsole: true);
             await emailService.SendNotificationAsync(
                 $"Ошибка интеграции MPIC: {mailbox.Username}", errorMsg);
@@ -104,7 +104,7 @@ public class MpicWorker : BackgroundService
         if (lastLetter.MessageId == null)
         {
             logger.LogWarning(
-                "Не удалось получить Message-ID для последнего письма. " +
+                "⚠️Не удалось получить Message-ID для последнего письма. " +
                 "Уведомления для этого письма не будут отслеживаться.");
         }
 
@@ -118,7 +118,7 @@ public class MpicWorker : BackgroundService
             if (lastDeals == null)
             {
                 string errorMsg =
-                    $"Не удалось получить сделки из Мегаплана для проверки ящика {mailbox.Username}.";
+                    $"❌Не удалось получить сделки из Мегаплана для проверки ящика {mailbox.Username}.";
                 logger.LogError(errorMsg, logToConsole: true);
                 await emailService.SendNotificationAsync(
                     $"Ошибка интеграции MPIC: {mailbox.Username}", errorMsg);
@@ -132,7 +132,7 @@ public class MpicWorker : BackgroundService
 
             if (isDealCreated)
             {
-                logger.LogInformation("Сделка из письма была создана.");
+                logger.LogInformation("✅Сделка из письма была создана.");
                 return;
             }
                 
@@ -143,7 +143,7 @@ public class MpicWorker : BackgroundService
             {
                 var timeToWaitMinutes = maxTimeToCreateDealAfterLetter - timeSinceLetter;
                 logger.LogInformation(
-                    $"Сделка для ящика {mailbox.Username} еще не создана. " +
+                    $"⚠️Сделка для ящика {mailbox.Username} еще не создана. " +
                     $"Ожидание {timeToWaitMinutes:F2} мин до повторной проверки.");
 
                 var actualWaitTime = TimeSpan.FromMinutes(Math.Max(1, timeToWaitMinutes));
@@ -161,7 +161,7 @@ public class MpicWorker : BackgroundService
 
             // Время вышло, сделки нет — фиксируем сбой
             string failMsg =
-                $"Сделка не была создана. Источник {mailbox.Username}, " +
+                $"❌Сделка не была создана. Источник {mailbox.Username}, " +
                 $"отправитель: <b>{lastLetter.Sender}</b>, получено в {targetDateTime}.";
             logger.LogError(failMsg, logToConsole: true);
 
@@ -227,7 +227,7 @@ public class MpicWorker : BackgroundService
             || string.IsNullOrWhiteSpace(settings.Password)
             || string.IsNullOrWhiteSpace(settings.BaseApUrl))
         {
-            logger.LogCritical("Ошибка: некорректные настройки для доступа к API Мегаплана.");
+            logger.LogCritical("❌Ошибка: некорректные настройки для доступа к API Мегаплана.");
             return null;
         }
 
@@ -258,7 +258,7 @@ public class MpicWorker : BackgroundService
             return emailDetails;
         }
 
-        logger.LogError("Не удалось получить данные о последнем письме", logToConsole: true);
+        logger.LogError("❌Не удалось получить данные о последнем письме", logToConsole: true);
         return null;
     }
 }
