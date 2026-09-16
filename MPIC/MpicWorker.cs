@@ -109,6 +109,7 @@ public class MpicWorker : BackgroundService
         }
 
         var targetDateTime = lastLetter.ReceivedDate.ToLocalTime().DateTime;
+        logger.LogInformation($"Работаю с письмом от {lastLetter.Sender}, получено: {targetDateTime}");
 
         // Внутренний цикл ожидания вместо рекурсии — корректно реагирует на остановку службы
         while (!stoppingToken.IsCancellationRequested)
